@@ -221,4 +221,22 @@ export const api = {
         total_otps: number;
       }>("/feed/channels"),
   },
+  notices: {
+    list: () =>
+      req<Array<{
+        id: number;
+        text: string;
+        target: "dm" | "channel" | "both";
+        sent_count: number;
+        failed_count: number;
+        total_targets: number;
+        status: string;
+        created_at: string | null;
+      }>>("/notices"),
+    send: (body: { text: string; target: "dm" | "channel" | "both" }) =>
+      req<{ id: number; sent: number; failed: number; total: number }>(
+        "/notices/send",
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+  },
 };
