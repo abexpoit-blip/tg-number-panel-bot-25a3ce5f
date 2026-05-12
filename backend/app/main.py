@@ -17,6 +17,7 @@ async def _ensure_columns(conn):
     """Add columns introduced after first deploy (idempotent)."""
     stmts = [
         "ALTER TABLE services  ADD COLUMN IF NOT EXISTS custom_emoji_id VARCHAR(64)",
+        "ALTER TABLE services  ADD COLUMN IF NOT EXISTS icon_mode VARCHAR(16) DEFAULT 'auto'",
         "ALTER TABLE countries ADD COLUMN IF NOT EXISTS custom_emoji_id VARCHAR(64)",
         "ALTER TABLE numbers  ADD COLUMN IF NOT EXISTS provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL",
         "ALTER TABLE otps     ADD COLUMN IF NOT EXISTS provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL",
