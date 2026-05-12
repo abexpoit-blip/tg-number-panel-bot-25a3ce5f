@@ -529,6 +529,67 @@ async def on_refresh(cb: CallbackQuery):
     await cb.answer("Refreshed")
 
 
+@dp.callback_query(F.data.startswith("vw:"))
+async def on_view_otps(cb: CallbackQuery):
+    """Paginated list of OTPs received for selected service+country(+range)."""
+    parts = cb.data.split(":")
+    # vw:svc:ctry:rng:page
+    svc_id = int(parts[1]); ctry_id = int(parts[2])
+    rng_id = int(parts[3]) if parts[3] not in ("", "0") else None
+    page = int(parts[4]) if len(parts) >= 5 else 0
+    PER_PAGE = 10
+    u = await ensure_user(cb.from_user)
+    async with SessionLocal() as s:
+        stmt = select(Number).where(
+            Number.assigned_user_id == u.id,
+            Number.service_id == svc_id,
+            Number.country_id == ctry_id,
+            Number.last_otp.is_not(None),
+        )
+        if rng_id is not None:
+            stmt = stmt.where(Number.range_id == rng_id)
+        stmt = stmt.order_by(Number.last_otp_at.desc().nullslast())
+        nums = (await s.execute(stmt)).scalars().all()
+        sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one_or_none()
+        ctry = (await s.execute(select(Country).where(Country.id == ctry_id))).scalar_one_or_none()
+
+    total = len(nums)
+    if total == 0:
+        await cb.answer("No OTPs received yet.", show_alert=True)
+        return
+    pages = (total + PER_PAGE - 1) // PER_PAGE
+    page = max(0, min(page, pages - 1))
+    chunk = nums[page * PER_PAGE : (page + 1) * PER_PAGE]
+
+    flag = (ctry.flag if ctry else "🌍")
+    semoji = (sv.emoji if sv else "📱")
+    cname = (ctry.name if ctry else "Country")
+    sname = (sv.name if sv else "Service")
+    lines = [f"{flag} {semoji} <b>{cname} · {sname}</b> — OTPs ({total})\n"]
+    start = page * PER_PAGE + 1
+    for i, n in enumerate(chunk, start=start):
+        lines.append(f"{i}. <code>+{n.phone}</code> ➜ <code>{n.last_otp}</code>")
+    lines.append(f"\nPage {page + 1}/{pages}")
+
+    rng_suffix = f":{rng_id}" if rng_id is not None else ":0"
+    nav: list[InlineKeyboardButton] = []
+    if page > 0:
+        nav.append(InlineKeyboardButton(text="◀ Prev", callback_data=f"vw:{svc_id}:{ctry_id}{rng_suffix}:{page - 1}"))
+    if page < pages - 1:
+        nav.append(InlineKeyboardButton(text="Next ▶", callback_data=f"vw:{svc_id}:{ctry_id}{rng_suffix}:{page + 1}"))
+    rows: list[list[InlineKeyboardButton]] = []
+    if nav:
+        rows.append(nav)
+    rows.append([InlineKeyboardButton(text="📥 Download all OTP", callback_data=f"dl:{svc_id}:{ctry_id}{rng_suffix}")])
+    rows.append([InlineKeyboardButton(text="↩ Back", callback_data=f"refresh:{svc_id}:{ctry_id}{rng_suffix}")])
+
+    try:
+        await cb.message.edit_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+    except Exception:
+        await cb.message.answer("\n".join(lines), reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+    await cb.answer()
+
+
 @dp.callback_query(F.data.startswith("chg:"))
 async def on_change_number(cb: CallbackQuery):
     svc_id, ctry_id, rng_id = _parse_svc_ctry_rng(cb.data)
