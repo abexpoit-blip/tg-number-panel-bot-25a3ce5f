@@ -495,6 +495,7 @@ async def render_user_numbers(target: Message, user_pk: int, svc_id: int, ctry_i
     rng_suffix = f":{range_id}" if range_id is not None else ":0"
     rows.append([InlineKeyboardButton(text="🔄 Change Number", callback_data=f"chg:{svc_id}:{ctry_id}{rng_suffix}")])
     rows.append([InlineKeyboardButton(text="🌍 Change Country", callback_data=f"svc:{svc_id}")])
+    rows.append([InlineKeyboardButton(text="📋 View OTPs", callback_data=f"vw:{svc_id}:{ctry_id}{rng_suffix}:0")])
     rows.append([InlineKeyboardButton(text="📥 Download all OTP", callback_data=f"dl:{svc_id}:{ctry_id}{rng_suffix}")])
 
     kb = InlineKeyboardMarkup(inline_keyboard=rows)
