@@ -173,6 +173,9 @@ export const api = {
         body: JSON.stringify(body),
       }),
   },
+  providers: {
+    list: () => req<any[]>("/providers"),
+  },
   ims: {
     accounts: () => req<any[]>("/ims/accounts"),
     test: (slot: "1" | "2") =>

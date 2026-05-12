@@ -8,9 +8,9 @@ from sqlalchemy.exc import IntegrityError
 from .auth import hash_pw, verify_pw
 from .config import settings
 from .db import Base, SessionLocal, engine
-from .models import Admin, Country, Service
+from .models import Admin, Country, Provider, Service
 from .routes import auth as auth_routes
-from .routes import countries, dashboard, ims, numbers, services, settings as settings_routes, sms, users, withdrawals
+from .routes import countries, dashboard, ims, numbers, providers as providers_routes, services, settings as settings_routes, sms, users, withdrawals
 
 
 async def _ensure_columns(conn):
@@ -75,6 +75,19 @@ async def lifespan(app: FastAPI):
             ]
             for name, code, iso, flag in ctry:
                 s.add(Country(name=name, code=code, iso=iso, flag=flag))
+        # seed IMS provider rows so admins can wire numbers to a specific IMS slot
+        existing_providers = {p.name for p in (await s.execute(select(Provider))).scalars().all()}
+        for slot_name in ("IMS #1", "IMS #2"):
+            if slot_name not in existing_providers:
+                s.add(Provider(
+                    name=slot_name,
+                    type="ims",
+                    base_url="https://www.imssms.org",
+                    username="",
+                    password="",
+                    currency="EUR",
+                    enabled=True,
+                ))
         try:
             await s.commit()
         except IntegrityError:
@@ -106,6 +119,7 @@ app.include_router(withdrawals.router, prefix="/withdrawals", tags=["withdrawals
 app.include_router(sms.router, prefix="/sms", tags=["sms"])
 app.include_router(settings_routes.router, prefix="/settings", tags=["settings"])
 app.include_router(ims.router, prefix="/ims", tags=["ims"])
+app.include_router(providers_routes.router, prefix="/providers", tags=["providers"])
 
 
 @app.get("/health")
