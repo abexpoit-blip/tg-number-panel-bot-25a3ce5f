@@ -16,14 +16,19 @@ class ServiceIn(BaseModel):
     keyword: str
     emoji: str = "📱"
     custom_emoji_id: str | None = None
+    icon_mode: str = "auto"
     enabled: bool = True
     sort_order: int = 0
+
+
+_ALLOWED_MODES = {"auto", "custom", "brand", "default"}
 
 
 def _to_dict(s: Service):
     return {
         "id": s.id, "name": s.name, "keyword": s.keyword, "emoji": s.emoji,
         "custom_emoji_id": s.custom_emoji_id,
+        "icon_mode": getattr(s, "icon_mode", None) or "auto",
         "enabled": s.enabled, "sort_order": s.sort_order,
     }
 
@@ -38,6 +43,8 @@ async def list_services(_: object = Depends(current_admin), db: AsyncSession = D
 async def create_service(body: ServiceIn, _: object = Depends(current_admin), db: AsyncSession = Depends(get_db)):
     data = body.model_dump()
     data["custom_emoji_id"] = clean_custom_emoji_id(data.get("custom_emoji_id"))
+    if data.get("icon_mode") not in _ALLOWED_MODES:
+        data["icon_mode"] = "auto"
     s = Service(**data)
     db.add(s)
     await db.commit()
@@ -52,6 +59,8 @@ async def update_service(sid: int, body: ServiceIn, _: object = Depends(current_
         raise HTTPException(404)
     data = body.model_dump()
     data["custom_emoji_id"] = clean_custom_emoji_id(data.get("custom_emoji_id"))
+    if data.get("icon_mode") not in _ALLOWED_MODES:
+        data["icon_mode"] = "auto"
     for k, v in data.items():
         setattr(s, k, v)
     await db.commit()
