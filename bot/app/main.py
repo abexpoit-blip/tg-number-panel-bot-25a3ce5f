@@ -288,7 +288,11 @@ async def on_service_chosen(cb: CallbackQuery):
 @dp.callback_query(F.data == "back:svc")
 async def back_to_services(cb: CallbackQuery):
     async with SessionLocal() as s:
-        services = (await s.execute(select(Service).where(Service.enabled == True).order_by(Service.sort_order, Service.id))).scalars().all()
+        services = await _services_with_available_numbers(s)
+    if not services:
+        await cb.message.edit_text("No services available right now.")
+        await cb.answer()
+        return
     kb = InlineKeyboardMarkup(inline_keyboard=[[svc_button(sv)] for sv in services])
     await cb.message.edit_text("🗝 <b>Select a Service:</b>", reply_markup=kb)
     await cb.answer()
