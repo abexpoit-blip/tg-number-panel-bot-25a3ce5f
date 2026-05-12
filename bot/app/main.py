@@ -498,7 +498,7 @@ async def render_user_numbers(target: Message, user_pk: int, svc_id: int, ctry_i
         rows.append([copy_button(label, copy)])
     rng_suffix = f":{range_id}" if range_id is not None else ":0"
     rows.append([InlineKeyboardButton(text="🔄 Change Number", callback_data=f"chg:{svc_id}:{ctry_id}{rng_suffix}")])
-    rows.append([InlineKeyboardButton(text="🌍 Change Country", callback_data=f"svc:{svc_id}")])
+    rows.append([InlineKeyboardButton(text="🌍 Change Country", callback_data=f"cc:{svc_id}")])
     rows.append([InlineKeyboardButton(text="📋 View OTPs", callback_data=f"vw:{svc_id}:{ctry_id}{rng_suffix}:0")])
     rows.append([InlineKeyboardButton(text="📥 Download all OTP", callback_data=f"dl:{svc_id}:{ctry_id}{rng_suffix}")])
 
@@ -506,6 +506,10 @@ async def render_user_numbers(target: Message, user_pk: int, svc_id: int, ctry_i
     if edit:
         try:
             await target.edit_text(header, reply_markup=kb)
+        except TelegramBadRequest as e:
+            # "message is not modified" → ignore; do not re-post a duplicate window.
+            if "not modified" not in str(e).lower():
+                await target.answer(header, reply_markup=kb)
         except Exception:
             await target.answer(header, reply_markup=kb)
     else:
