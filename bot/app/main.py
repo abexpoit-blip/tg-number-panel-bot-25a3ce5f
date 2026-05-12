@@ -247,36 +247,56 @@ async def on_get_number(msg: Message):
 async def on_service_chosen(cb: CallbackQuery):
     svc_id = int(cb.data.split(":")[1])
     async with SessionLocal() as s:
-        # countries that have at least one available number for this service
+        # All available numbers for this service, with their range (if any)
         rows = (await s.execute(
-            select(Country, Number)
+            select(Country, Number, CountryRange)
             .join(Number, Number.country_id == Country.id)
+            .outerjoin(CountryRange, CountryRange.id == Number.range_id)
             .where(Number.service_id == svc_id, Number.enabled == True, Number.assigned_user_id.is_(None))
         )).all()
-    if not rows:
-        await cb.message.edit_text("😕 No numbers available for this service. Try again later.")
-        await cb.answer()
-        return
-    counts: dict[int, tuple[Country, int]] = {}
-    for c, _n in rows:
-        if c.id not in counts:
-            counts[c.id] = (c, 0)
-        counts[c.id] = (c, counts[c.id][1] + 1)
-    buttons = []
-    for cid, (c, cnt) in sorted(counts.items(), key=lambda kv: -kv[1][1]):
-        buttons.append([InlineKeyboardButton(
-            text=f"{c.flag} {c.name} (+{c.code}) - {cnt}",
-            callback_data=f"ctry:{svc_id}:{cid}",
-        )])
-    buttons.append([InlineKeyboardButton(text="⬅️ Back To Services", callback_data="back:svc")])
-    async with SessionLocal() as s:
+        if not rows:
+            await cb.message.edit_text("😕 No numbers available for this service. Try again later.")
+            await cb.answer()
+            return
+        # Group by (country_id, range_id) — each range becomes its own entry
+        # key: (country_id, range_id or 0) -> (Country, CountryRange|None, count)
+        groups: dict[tuple[int, int], tuple[Country, "CountryRange|None", int]] = {}
+        for c, _n, r in rows:
+            # Skip groups whose range is disabled
+            if r is not None and not r.enabled:
+                continue
+            key = (c.id, r.id if r else 0)
+            cur = groups.get(key)
+            if cur is None:
+                groups[key] = (c, r, 1)
+            else:
+                groups[key] = (cur[0], cur[1], cur[2] + 1)
+        if not groups:
+            await cb.message.edit_text("😕 No numbers available for this service. Try again later.")
+            await cb.answer()
+            return
         sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one()
-    country_lines = "\n".join(
-        f"{flag_html(c)} <b>{c.name}</b> (+{c.code}) - {cnt}"
-        for _cid, (c, cnt) in sorted(counts.items(), key=lambda kv: -kv[1][1])
-    )
+    # Sort: by country, then range sort_order/id; un-ranged first within a country
+    def sort_key(item):
+        (cid, rid), (c, r, cnt) = item
+        return (-cnt, c.name.lower(), 0 if r is None else 1, (r.sort_order if r else 0), rid)
+    ordered = sorted(groups.items(), key=sort_key)
+    buttons = []
+    lines = []
+    for (cid, rid), (c, r, cnt) in ordered:
+        if r is None:
+            label = f"{c.flag} {c.name} (+{c.code}) - {cnt}"
+            cb_data = f"ctry:{svc_id}:{cid}"
+            line = f"{flag_html(c)} <b>{c.name}</b> (+{c.code}) - {cnt}"
+        else:
+            label = f"{c.flag} {c.name} {r.name} (+{c.code}) - {cnt}"
+            cb_data = f"rng:{svc_id}:{cid}:{rid}"
+            line = f"{flag_html(c)} <b>{c.name} {r.name}</b> (+{c.code}) - {cnt}"
+        buttons.append([InlineKeyboardButton(text=label, callback_data=cb_data)])
+        lines.append(line)
+    buttons.append([InlineKeyboardButton(text="⬅️ Back To Services", callback_data="back:svc")])
     await cb.message.edit_text(
-        f"{emoji_html(sv)} <b>Select country for {sv.name}:</b>\n\n{country_lines}",
+        f"{emoji_html(sv)} <b>Select country for {sv.name}:</b>\n\n" + "\n".join(lines),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
     )
     await cb.answer()
