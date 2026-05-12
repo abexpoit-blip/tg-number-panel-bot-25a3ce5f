@@ -122,7 +122,7 @@ export default function Numbers() {
 
         <div className="glass-card p-5">
           <h3 className="mb-3 font-display text-base font-semibold">Bulk add (one per line)</h3>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Select value={String(bulk.service_id)} onValueChange={(v) => setBulk({ ...bulk, service_id: +v })}>
               <SelectTrigger><SelectValue placeholder="Service" /></SelectTrigger>
               <SelectContent>{services.map((s) => <SelectItem key={s.id} value={String(s.id)}><ServiceBadge service={s} /></SelectItem>)}</SelectContent>
