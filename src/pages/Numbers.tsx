@@ -96,7 +96,7 @@ export default function Numbers() {
               <SelectTrigger><SelectValue placeholder="Service" /></SelectTrigger>
               <SelectContent>{services.map((s) => <SelectItem key={s.id} value={String(s.id)}><ServiceBadge service={s} /></SelectItem>)}</SelectContent>
             </Select>
-            <Select value={String(single.country_id)} onValueChange={(v) => setSingle({ ...single, country_id: +v })}>
+            <Select value={String(single.country_id)} onValueChange={(v) => setSingle({ ...single, country_id: +v, range_id: 0 })}>
               <SelectTrigger><SelectValue placeholder="Country" /></SelectTrigger>
               <SelectContent>{countries.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.flag} {c.name}</SelectItem>)}</SelectContent>
             </Select>
