@@ -45,32 +45,48 @@ export default function Services() {
       <PageHeader title="Services" subtitle="WhatsApp, Facebook, Instagram, Telegram…" />
 
       <div className="glass-card mb-6 p-5">
-        <div className="grid gap-3 sm:grid-cols-[100px_1fr_120px_180px_80px_auto_auto]">
+        <div className="grid gap-3 sm:grid-cols-[100px_1fr_120px_180px_120px_80px_auto_auto]">
           <Input placeholder="code" value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} />
           <Input placeholder="name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
           <Input placeholder="🟢 button icon" title="Unicode emoji shown on the inline button" value={draft.emoji} onChange={(e) => setDraft({ ...draft, emoji: e.target.value })} />
           <EmojiIdField value={draft.custom_emoji_id} onChange={(v) => setDraft({ ...draft, custom_emoji_id: v })} className="h-9 w-full font-mono text-xs" placeholder="premium emoji ID (msg text)" />
+          <select
+            value={draft.icon_mode}
+            onChange={(e) => setDraft({ ...draft, icon_mode: e.target.value as IconMode })}
+            className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+            title="How the inline-button icon is picked"
+          >
+            {ICON_MODES.map((m) => <option key={m.value} value={m.value} title={m.hint}>{m.label}</option>)}
+          </select>
           <Input type="number" placeholder="sort" value={draft.sort_order} onChange={(e) => setDraft({ ...draft, sort_order: +e.target.value })} />
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
             <Switch checked={draft.enabled} onCheckedChange={(v) => setDraft({ ...draft, enabled: v })} /> enabled
           </label>
           <Button onClick={create} className="bg-gradient-primary text-primary-foreground"><Plus className="mr-1 h-4 w-4" /> Add</Button>
         </div>
+        <div className="mt-3 flex items-center gap-3">
+          <span className="text-xs text-muted-foreground">Live preview:</span>
+          <ServiceButtonPreview service={draft} />
+          {draft.icon_mode === "brand" && !brandEmojiFor(draft) && (
+            <span className="text-xs text-amber-400">No brand match for "{draft.name || draft.code}" — falling back.</span>
+          )}
+        </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          🔘 <b>Button Icon</b>: a plain unicode emoji (🟢 🔵 🟣 ✈️ 🎵 …) shown on the inline service button. Telegram does <em>not</em> render premium emojis inside buttons.<br />
-          💎 <b>Premium emoji ID</b>: forward the emoji from <a className="underline" href="https://t.me/addemoji/ApplicationEmoji" target="_blank" rel="noreferrer">ApplicationEmoji</a> to <code>@RawDataBot</code>, copy <code>custom_emoji_id</code>, paste here. Used in message text via <code>&lt;tg-emoji&gt;</code>.
+          🔘 <b>Icon Mode</b> controls which emoji renders on the inline button:
+          <b> Auto</b> = custom → brand → default · <b>Custom</b> = the emoji field · <b>Brand</b> = WhatsApp→🟢, Facebook→🔵, … · <b>Default</b> = 📱.<br />
+          💎 <b>Premium emoji ID</b>: forward the emoji from <a className="underline" href="https://t.me/addemoji/ApplicationEmoji" target="_blank" rel="noreferrer">ApplicationEmoji</a> to <code>@RawDataBot</code>, copy <code>custom_emoji_id</code>, paste here. Used in message text via <code>&lt;tg-emoji&gt;</code> — Telegram does not render premium emojis inside buttons.
         </p>
       </div>
 
       <div className="glass-card overflow-hidden p-0">
         <table className="data-table">
-          <thead><tr><th>ID</th><th>Preview</th><th>Code</th><th>Name</th><th title="Unicode emoji on inline button">Button Icon</th><th title="Premium emoji rendered in message text">Premium ID</th><th>Sort</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>ID</th><th>Badge</th><th>Code</th><th>Name</th><th title="Unicode emoji on inline button">Icon</th><th title="Premium emoji rendered in message text">Premium ID</th><th title="How the icon is chosen for the inline button">Mode</th><th title="Live preview of the inline button">Button Preview</th><th>Sort</th><th>Status</th><th></th></tr></thead>
           <tbody>
             {list.map((s) => (
               <tr key={s.id}>
                 <td className="text-muted-foreground">#{s.id}</td>
                 <td><ServiceBadge service={s} size="md" /></td>
-                <td><Input value={s.code} onChange={(e) => patch(s.id, "code", e.target.value)} className="h-8 w-24" /></td>
+                <td><Input value={s.code ?? ""} onChange={(e) => patch(s.id, "code", e.target.value)} className="h-8 w-24" /></td>
                 <td><Input value={s.name} onChange={(e) => patch(s.id, "name", e.target.value)} className="h-8 w-44" /></td>
                 <td><Input value={s.emoji} onChange={(e) => patch(s.id, "emoji", e.target.value)} className="h-8 w-16" /></td>
                 <td>
@@ -80,6 +96,16 @@ export default function Services() {
                     showMissingWarning={s.enabled}
                   />
                 </td>
+                <td>
+                  <select
+                    value={s.icon_mode ?? "auto"}
+                    onChange={(e) => patch(s.id, "icon_mode", e.target.value as IconMode)}
+                    className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                  >
+                    {ICON_MODES.map((m) => <option key={m.value} value={m.value} title={m.hint}>{m.label}</option>)}
+                  </select>
+                </td>
+                <td><ServiceButtonPreview service={s} /></td>
                 <td><Input type="number" value={s.sort_order} onChange={(e) => patch(s.id, "sort_order", +e.target.value)} className="h-8 w-20" /></td>
                 <td><Switch checked={s.enabled} onCheckedChange={(v) => patch(s.id, "enabled", v)} /></td>
                 <td className="text-right">
@@ -90,7 +116,7 @@ export default function Services() {
                 </td>
               </tr>
             ))}
-            {list.length === 0 && (<tr><td colSpan={9} className="py-10 text-center text-muted-foreground">No services yet.</td></tr>)}
+            {list.length === 0 && (<tr><td colSpan={11} className="py-10 text-center text-muted-foreground">No services yet.</td></tr>)}
           </tbody>
         </table>
       </div>
