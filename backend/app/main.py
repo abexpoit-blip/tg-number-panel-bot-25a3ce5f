@@ -10,7 +10,7 @@ from .config import settings
 from .db import Base, SessionLocal, engine
 from .models import Admin, Country, Service
 from .routes import auth as auth_routes
-from .routes import countries, dashboard, numbers, providers, services, settings as settings_routes, sms, users, withdrawals
+from .routes import countries, dashboard, ims, numbers, services, settings as settings_routes, sms, users, withdrawals
 
 
 async def _ensure_columns(conn):
@@ -104,7 +104,7 @@ app.include_router(users.router, prefix="/users", tags=["users"])
 app.include_router(withdrawals.router, prefix="/withdrawals", tags=["withdrawals"])
 app.include_router(sms.router, prefix="/sms", tags=["sms"])
 app.include_router(settings_routes.router, prefix="/settings", tags=["settings"])
-app.include_router(providers.router, prefix="/providers", tags=["providers"])
+app.include_router(ims.router, prefix="/ims", tags=["ims"])
 
 
 @app.get("/health")

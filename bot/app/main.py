@@ -22,7 +22,7 @@ from .config import settings
 from .db import Base, Country, Number, Otp, Service, SessionLocal, TgUser, engine
 from .emoji import flag_emoji_html, service_emoji_html
 from .parser import parse_message
-from .providers_worker import providers_main
+from .ims_worker import ims_main
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 log = logging.getLogger("bot")
@@ -455,7 +455,7 @@ async def main():
 
     log.info("Starting bot. Brand=%s Feed=%s", settings.BOT_BRAND_NAME, settings.OTP_FEED_CHANNEL_ID)
     # background worker for IPRN/other providers
-    asyncio.create_task(providers_main(bot))
+    asyncio.create_task(ims_main(bot))
     # Explicit update list so private chats (`message`) AND channel feed both work.
     await dp.start_polling(
         bot,
