@@ -53,7 +53,7 @@ export default function Numbers() {
     const arr = bulk.msisdns.split(/[\s,;]+/).filter(Boolean);
     if (!arr.length) return toast.error("Paste numbers");
     try {
-      const r = await api.numbers.bulk({ msisdns: arr, service_id: bulk.service_id, country_id: bulk.country_id, provider_id: bulk.provider_id || null });
+      const r = await api.numbers.bulk({ msisdns: arr, service_id: bulk.service_id, country_id: bulk.country_id, provider_id: bulk.provider_id || null, range_id: bulk.range_id || null });
       toast.success(`Inserted ${r.inserted} of ${r.submitted}`);
       setBulk({ ...bulk, msisdns: "" }); load();
     } catch (e: any) { toast.error(e.message); }
