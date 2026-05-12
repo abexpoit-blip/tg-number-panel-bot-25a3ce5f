@@ -75,6 +75,39 @@ def flag_html(c: Country | None) -> str:
     return flag_emoji_html(c)
 
 
+_BRAND_EMOJI = {
+    "whatsapp": "🟢", "wa": "🟢",
+    "facebook": "🔵", "fb": "🔵",
+    "instagram": "🟣", "ig": "🟣",
+    "telegram": "✈️", "tg": "✈️",
+    "tiktok": "🎵", "tt": "🎵",
+    "twitter": "🐦", "x": "🐦",
+    "google": "🔴", "gmail": "📧",
+    "discord": "💬", "signal": "📞",
+    "viber": "🟪", "wechat": "💚", "line": "💚",
+    "snapchat": "👻", "youtube": "📺",
+}
+
+
+def service_btn_emoji(sv: Service) -> str:
+    """Pick a simple unicode emoji for an inline button (premium emojis don't render in buttons)."""
+    raw = (getattr(sv, "emoji", None) or "").strip()
+    if raw and not raw.isdigit():
+        return raw
+    key = f"{(sv.code or '')} {(sv.name or '')}".lower()
+    for k, v in _BRAND_EMOJI.items():
+        if k in key:
+            return v
+    return "📱"
+
+
+def svc_button(sv: Service) -> InlineKeyboardButton:
+    emo = service_btn_emoji(sv)
+    nm = (sv.name or "Service").strip()
+    return InlineKeyboardButton(text=f"{emo} {nm}", callback_data=f"svc:{sv.id}")
+
+
+
 # ============= UI =============
 
 def main_menu_kb() -> ReplyKeyboardMarkup:
