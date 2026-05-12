@@ -317,46 +317,12 @@ async def on_country_chosen(cb: CallbackQuery):
     svc_id, ctry_id = int(svc_id_s), int(ctry_id_s)
     u = await ensure_user(cb.from_user)
     async with SessionLocal() as s:
-        # If this country has any enabled ranges with available numbers, show range sub-menu
-        rng_rows = (await s.execute(
-            select(CountryRange, Number)
-            .join(Number, Number.range_id == CountryRange.id)
-            .where(
-                CountryRange.country_id == ctry_id,
-                CountryRange.enabled == True,
-                Number.service_id == svc_id,
-                Number.enabled == True,
-                Number.assigned_user_id.is_(None),
-            )
-        )).all()
-        if rng_rows:
-            counts: dict[int, tuple[CountryRange, int]] = {}
-            for r, _n in rng_rows:
-                cur = counts.get(r.id, (r, 0))
-                counts[r.id] = (r, cur[1] + 1)
-            sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one()
-            ctry = (await s.execute(select(Country).where(Country.id == ctry_id))).scalar_one()
-            buttons = []
-            lines = []
-            for _rid, (r, cnt) in sorted(counts.items(), key=lambda kv: (kv[1][0].sort_order, kv[1][0].id)):
-                buttons.append([InlineKeyboardButton(
-                    text=f"{ctry.flag} {r.name} - {cnt}",
-                    callback_data=f"rng:{svc_id}:{ctry_id}:{r.id}",
-                )])
-                lines.append(f"{flag_html(ctry)} <b>{r.name}</b> - {cnt}")
-            buttons.append([InlineKeyboardButton(text="⬅️ Back To Countries", callback_data=f"svc:{svc_id}")])
-            await cb.message.edit_text(
-                f"{emoji_html(sv)} <b>Pick a {ctry.name} range:</b>\n\n" + "\n".join(lines),
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
-            )
-            await cb.answer()
-            return
-
-        # Fallback: no ranges configured — assign directly as before
+        # Assign un-ranged numbers (ranges are now picked directly from the country list)
         avail = (await s.execute(
             select(Number).where(
                 Number.service_id == svc_id,
                 Number.country_id == ctry_id,
+                Number.range_id.is_(None),
                 Number.enabled == True,
                 Number.assigned_user_id.is_(None),
             ).limit(5)
