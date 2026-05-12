@@ -89,7 +89,7 @@ async def send_otp_message(
         f"{flag}{hashtag} {emoji} <code>{phone}</code>"
     )
 
-    keyboard = await _build_keyboard(code)
+    keyboard = await _build_keyboard(code, service)
     payload = {
         "chat_id": chat_id,
         "text": text,
