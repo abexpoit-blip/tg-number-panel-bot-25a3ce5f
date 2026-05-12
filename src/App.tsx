@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import LiveOTP from "./pages/LiveOTP";
 import FeedChannels from "./pages/FeedChannels";
+import Notices from "./pages/Notices";
 import Numbers from "./pages/Numbers";
 import Services from "./pages/Services";
 import Providers from "./pages/Providers";
