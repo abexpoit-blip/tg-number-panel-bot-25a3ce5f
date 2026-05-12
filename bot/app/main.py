@@ -534,7 +534,8 @@ async def on_change_number(cb: CallbackQuery):
     svc_id, ctry_id, rng_id = _parse_svc_ctry_rng(cb.data)
     u = await ensure_user(cb.from_user)
     async with SessionLocal() as s:
-        # release current numbers without OTP and assign new ones (within range if applicable)
+        # Retire current un-OTP'd numbers (disable them so the pool never re-serves them).
+        # Per policy: once a number is given to a user it must NEVER go back to the pool.
         cur_stmt = select(Number).where(
             Number.assigned_user_id == u.id,
             Number.service_id == svc_id,
@@ -545,8 +546,7 @@ async def on_change_number(cb: CallbackQuery):
             cur_stmt = cur_stmt.where(Number.range_id == rng_id)
         current = (await s.execute(cur_stmt)).scalars().all()
         for n in current:
-            n.assigned_user_id = None
-            n.assigned_at = None
+            n.enabled = False  # retire from pool; keep assigned_user_id for audit trail
         await s.flush()
         av_stmt = select(Number).where(
             Number.service_id == svc_id,
