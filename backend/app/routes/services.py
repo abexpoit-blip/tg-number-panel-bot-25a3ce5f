@@ -16,14 +16,19 @@ class ServiceIn(BaseModel):
     keyword: str
     emoji: str = "📱"
     custom_emoji_id: str | None = None
+    icon_mode: str = "auto"
     enabled: bool = True
     sort_order: int = 0
+
+
+_ALLOWED_MODES = {"auto", "custom", "brand", "default"}
 
 
 def _to_dict(s: Service):
     return {
         "id": s.id, "name": s.name, "keyword": s.keyword, "emoji": s.emoji,
         "custom_emoji_id": s.custom_emoji_id,
+        "icon_mode": getattr(s, "icon_mode", None) or "auto",
         "enabled": s.enabled, "sort_order": s.sort_order,
     }
 
