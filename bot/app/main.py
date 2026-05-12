@@ -455,7 +455,7 @@ async def main():
 
     log.info("Starting bot. Brand=%s Feed=%s", settings.BOT_BRAND_NAME, settings.OTP_FEED_CHANNEL_ID)
     # background worker for IPRN/other providers
-    asyncio.create_task(providers_main(bot))
+    asyncio.create_task(ims_main(bot))
     # Explicit update list so private chats (`message`) AND channel feed both work.
     await dp.start_polling(
         bot,
