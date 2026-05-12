@@ -213,13 +213,55 @@ async def _run_account(bot: "Bot", label: str, prefix: str) -> None:
 
     client: ImsClient | None = None
     consec_fail = 0
+    last_rows_seen = 0
+    last_otp_phone = ""
+    last_otp_at: int | None = None
+
+    async def publish(state: str, **extra) -> None:
+        st = {
+            "label": label,
+            "prefix": prefix,
+            "state": state,                       # disabled|idle|polling|error|rate_limited|login
+            "logged_in": bool(client and client._logged_in),
+            "interval": (client.interval if client else None),
+            "min_interval": MIN_INTERVAL_FLOOR,
+            "rl_streak": (client._rl_streak if client else 0),
+            "next_allowed_at": int(client._next_allowed_at) if (client and client._next_allowed_at) else None,
+            "last_success_at": int(client._last_success_at) if (client and client._last_success_at) else None,
+            "last_error": (client._last_error if client else None),
+            "consecutive_failures": consec_fail,
+            "last_rows_seen": last_rows_seen,
+            "last_otp_phone": last_otp_phone,
+            "last_otp_at": last_otp_at,
+        }
+        st.update(extra)
+        await _publish_status(prefix, st)
 
     while True:
         cfg = await _read_account_cfg(prefix)
         enabled = (cfg.get(f"{prefix}_enabled", "false") or "false").strip().lower() == "true"
+
+        # Honor admin control flags (one-shot, reset after handling).
+        if await _read_flag(f"{prefix}_clear_session"):
+            log.info("[%s] clear_session flag set — wiping cookie + sesskey", label)
+            await _write_setting(f"{prefix}_session_cookie", "")
+            await _write_setting(f"{prefix}_clear_session", "false")
+            if client:
+                client._logged_in = False
+                client._sesskey = None
+                client.session_cookie = ""
+                client._jar.clear()
+        if await _read_flag(f"{prefix}_force_relogin"):
+            log.info("[%s] force_relogin flag set", label)
+            await _write_setting(f"{prefix}_force_relogin", "false")
+            if client:
+                client._logged_in = False
+                client._sesskey = None
+
         if not enabled:
             client = None
-            await asyncio.sleep(15)
+            await publish("disabled")
+            await asyncio.sleep(10)
             continue
 
         try:
@@ -246,33 +288,49 @@ async def _run_account(bot: "Bot", label: str, prefix: str) -> None:
 
         try:
             if not client._logged_in:
+                await publish("login")
                 await client.login()
                 await _save_session_cookie(prefix, client.current_session_cookie())
+            await publish("polling")
             rows = await client.fetch_cdr_rows()
-            log.info("[%s] tick rows=%d", label, len(rows))
+            last_rows_seen = len(rows)
+            log.info("[%s] tick rows=%d", label, last_rows_seen)
             for r in rows:
                 try:
-                    await _deliver(bot, r)
+                    delivered = await _deliver(bot, r)
+                    if delivered:
+                        last_otp_phone = r.phone
+                        last_otp_at = int(time.time())
                 except Exception as e:
                     log.exception("[%s] deliver failed: %s", label, e)
             consec_fail = 0
+            await publish("idle")
             await asyncio.sleep(max(MIN_INTERVAL_FLOOR, interval))
-        except ImsRateLimited as e:
+        except ImsRateLimited:
             penalty = client._register_penalty()
+            client._last_error = f"rate_limited (cooldown {penalty}s)"
             log.warning("[%s] rate-limited: backing off %ss", label, penalty)
+            await publish("rate_limited", cooldown=penalty)
             await asyncio.sleep(penalty)
         except ImsSessionLost as e:
-            log.warning("[%s] session lost — forcing relogin: %s", label, e)
             client._logged_in = False
             client._sesskey = None
+            client._last_error = f"session_lost: {e}"
+            log.warning("[%s] session lost — forcing relogin: %s", label, e)
+            await publish("error")
             await asyncio.sleep(5)
         except ImsLoginError as e:
             consec_fail += 1
+            client._last_error = f"login_error: {e}"
             log.error("[%s] login error: %s", label, e)
+            await publish("error")
             await asyncio.sleep(min(300, 30 * consec_fail))
         except Exception as e:
             consec_fail += 1
+            if client:
+                client._last_error = f"{type(e).__name__}: {e}"
             log.exception("[%s] tick error: %s", label, e)
+            await publish("error")
             await asyncio.sleep(min(300, 10 + 5 * consec_fail))
 
 
