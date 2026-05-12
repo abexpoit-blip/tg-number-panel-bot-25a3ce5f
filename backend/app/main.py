@@ -32,6 +32,12 @@ async def _ensure_columns(conn):
         # Country ranges: optional sub-step under each country.
         "ALTER TABLE numbers  ADD COLUMN IF NOT EXISTS range_id INTEGER REFERENCES country_ranges(id) ON DELETE SET NULL",
         "CREATE INDEX IF NOT EXISTS ix_numbers_range_id ON numbers(range_id)",
+        # Replace the old (phone, service_id) unique constraint so that the same
+        # phone can be added to the same service under different ranges.
+        "ALTER TABLE numbers DROP CONSTRAINT IF EXISTS uq_phone_service",
+        "DROP INDEX IF EXISTS uq_phone_service",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_phone_service_range ON numbers(phone, service_id, range_id) WHERE range_id IS NOT NULL",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_phone_service_norange ON numbers(phone, service_id) WHERE range_id IS NULL",
     ]
     from sqlalchemy import text
     for s in stmts:

@@ -104,7 +104,8 @@ class Number(Base):
     provider: Mapped["Provider | None"] = relationship(lazy="joined")
     range_: Mapped["CountryRange | None"] = relationship(lazy="joined", foreign_keys=[range_id])
 
-    __table_args__ = (UniqueConstraint("phone", "service_id", name="uq_phone_service"),)
+    # Uniqueness is enforced at the DB level via partial indexes (see main.py
+    # _ensure_columns) so the same phone+service can exist in different ranges.
 
 
 class Otp(Base):
