@@ -16,7 +16,7 @@ from aiogram.types import (
     Message,
     ReplyKeyboardMarkup,
 )
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from .config import settings
 from .db import Base, Country, CountryRange, Number, Otp, Service, SessionLocal, TgUser, engine
@@ -247,30 +247,39 @@ async def on_get_number(msg: Message):
 async def on_service_chosen(cb: CallbackQuery):
     svc_id = int(cb.data.split(":")[1])
     async with SessionLocal() as s:
-        # All available numbers for this service, with their range (if any)
+        # Per-(country, range) accurate available counts in a single GROUP BY.
+        # "available" = enabled & unassigned. Disabled ranges are excluded entirely
+        # so their numbers do not leak into the un-ranged bucket either.
         rows = (await s.execute(
-            select(Country, Number, CountryRange)
-            .join(Number, Number.country_id == Country.id)
-            .outerjoin(CountryRange, CountryRange.id == Number.range_id)
-            .where(Number.service_id == svc_id, Number.enabled == True, Number.assigned_user_id.is_(None))
+            select(
+                Country,
+                CountryRange,
+                func.count(Number.id).label("cnt"),
+            )
+            .select_from(Number)
+            .join(Country, Country.id == Number.country_id)
+            .outerjoin(
+                CountryRange,
+                (CountryRange.id == Number.range_id) & (CountryRange.enabled == True),  # noqa: E712
+            )
+            .where(
+                Number.service_id == svc_id,
+                Number.enabled == True,  # noqa: E712
+                Number.assigned_user_id.is_(None),
+                # drop numbers whose range is disabled (range_id set but join missed)
+                (Number.range_id.is_(None)) | (CountryRange.id.is_not(None)),
+            )
+            .group_by(Country.id, CountryRange.id)
         )).all()
         if not rows:
             await cb.message.edit_text("😕 No numbers available for this service. Try again later.")
             await cb.answer()
             return
-        # Group by (country_id, range_id) — each range becomes its own entry
-        # key: (country_id, range_id or 0) -> (Country, CountryRange|None, count)
-        groups: dict[tuple[int, int], tuple[Country, "CountryRange|None", int]] = {}
-        for c, _n, r in rows:
-            # Skip groups whose range is disabled
-            if r is not None and not r.enabled:
-                continue
-            key = (c.id, r.id if r else 0)
-            cur = groups.get(key)
-            if cur is None:
-                groups[key] = (c, r, 1)
-            else:
-                groups[key] = (cur[0], cur[1], cur[2] + 1)
+        # rows already deduped by GROUP BY; no manual aggregation needed.
+        groups: dict[tuple[int, int], tuple[Country, "CountryRange|None", int]] = {
+            (c.id, r.id if r else 0): (c, r, int(cnt or 0))
+            for c, r, cnt in rows if int(cnt or 0) > 0
+        }
         if not groups:
             await cb.message.edit_text("😕 No numbers available for this service. Try again later.")
             await cb.answer()

@@ -86,6 +86,16 @@ async def dashboard_range_stats(_: object = Depends(current_admin), db: AsyncSes
     Each country range (Peru 1, Peru 2, ...) shows up as its own row, plus a
     pseudo-row for un-ranged numbers (range_id IS NULL) labelled just by country.
     """
+    # Conditional aggregates so a single GROUP BY gives accurate per-bucket counts.
+    # "available" matches the bot's definition: enabled & not yet assigned to anyone.
+    # Disabled ranges are excluded from buckets entirely (their numbers also drop out).
+    available_expr = func.count(Number.id).filter(
+        Number.enabled == True,  # noqa: E712
+        Number.assigned_user_id.is_(None),
+    )
+    assigned_expr = func.count(Number.id).filter(Number.assigned_user_id.is_not(None))
+    disabled_expr = func.count(Number.id).filter(Number.enabled == False)  # noqa: E712
+
     rows = (await db.execute(
         select(
             Country.id.label("cid"),
@@ -96,18 +106,26 @@ async def dashboard_range_stats(_: object = Depends(current_admin), db: AsyncSes
             CountryRange.name.label("rname"),
             CountryRange.sort_order.label("rsort"),
             func.count(Number.id).label("total"),
-            func.count(Number.assigned_user_id).label("assigned"),
+            assigned_expr.label("assigned"),
+            available_expr.label("available"),
+            disabled_expr.label("disabled"),
         )
         .select_from(Number)
         .join(Country, Country.id == Number.country_id)
-        .outerjoin(CountryRange, CountryRange.id == Number.range_id)
-        .group_by(Country.id, CountryRange.id)
+        .outerjoin(
+            CountryRange,
+            (CountryRange.id == Number.range_id) & (CountryRange.enabled == True),  # noqa: E712
+        )
+        # Drop numbers that point to a disabled range (range_id set but join missed because enabled=False)
+        .where(
+            (Number.range_id.is_(None)) | (CountryRange.id.is_not(None))
+        )
+        .group_by(Country.id, CountryRange.id, CountryRange.name, CountryRange.sort_order)
     )).all()
 
     out = []
     for r in rows:
         total = int(r.total or 0)
-        assigned = int(r.assigned or 0)
         out.append({
             "country_id": r.cid,
             "country_name": r.cname,
@@ -117,8 +135,13 @@ async def dashboard_range_stats(_: object = Depends(current_admin), db: AsyncSes
             "range_name": r.rname,
             "label": (f"{r.cname} {r.rname}" if r.rname else r.cname),
             "total": total,
-            "assigned": assigned,
-            "available": total - assigned,
+            "assigned": int(r.assigned or 0),
+            "available": int(r.available or 0),
+            "disabled": int(r.disabled or 0),
         })
-    out.sort(key=lambda x: (x["country_name"].lower(), 0 if x["range_id"] is None else 1, x["range_name"] or ""))
+    out.sort(key=lambda x: (
+        x["country_name"].lower(),
+        0 if x["range_id"] is None else 1,
+        x["range_name"] or "",
+    ))
     return out
