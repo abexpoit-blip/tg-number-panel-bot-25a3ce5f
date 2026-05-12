@@ -43,6 +43,7 @@ async def _ensure_columns(conn):
         # Persistent idempotency guard used by the bot so restarts/code updates
         # do not resend the same provider/feed OTP row again.
         "CREATE TABLE IF NOT EXISTS otp_delivery_events (event_key VARCHAR(128) PRIMARY KEY, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+        "ALTER TABLE otps ADD COLUMN IF NOT EXISTS raw_text TEXT DEFAULT ''",
     ]
     from sqlalchemy import text
     for s in stmts:
