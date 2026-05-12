@@ -184,11 +184,10 @@ async def on_get_number(msg: Message):
         return
     def _svc_btn(sv: Service) -> InlineKeyboardButton:
         emo = (sv.emoji or "📱").strip()
-        nm = (sv.name or "Service").strip().upper()
-        return InlineKeyboardButton(text=f"   {emo}   {nm}   ", callback_data=f"svc:{sv.id}")
+        nm = (sv.name or "Service").strip()
+        return InlineKeyboardButton(text=f"{emo} {nm}", callback_data=f"svc:{sv.id}")
     kb = InlineKeyboardMarkup(inline_keyboard=[[_svc_btn(sv)] for sv in services])
-    service_lines = "\n".join(f"{emoji_html(sv)} <b>{sv.name}</b>" for sv in services)
-    await msg.answer(f"🎚 <b>Select a Service:</b>\n\n{service_lines}", reply_markup=kb)
+    await msg.answer("🗝 <b>Select a Service:</b>", reply_markup=kb)
 
 
 @dp.callback_query(F.data.startswith("svc:"))
