@@ -96,12 +96,17 @@ export default function Settings() {
     return <Input value={v ?? ""} onChange={(e) => setS({ ...s, [k]: e.target.value })} />;
   };
 
+  // Hide reward keys from generic grid — rendered in dedicated card below
+  const hidden = new Set(["reward_enabled", "reward_per_otp"]);
+
   return (
     <>
       <PageHeader title="Settings" subtitle="All values are live — bot reads them from DB on every action" />
 
+      <RewardsCard s={s} setS={setS} />
+
       <div className="grid gap-4 md:grid-cols-2">
-        {Object.keys(s).map((k) => (
+        {Object.keys(s).filter((k) => !hidden.has(k)).map((k) => (
           <div key={k} className="glass-card p-5">
             <div className="mb-3 text-sm font-medium text-foreground">{LABELS[k] || k}</div>
             <div className="flex items-center gap-3">
@@ -118,5 +123,84 @@ export default function Settings() {
         )}
       </div>
     </>
+  );
+}
+
+function RewardsCard({ s, setS }: { s: Record<string, any>; setS: (v: Record<string, any>) => void }) {
+  const enabledRaw = s.reward_enabled;
+  const enabled = enabledRaw === true || String(enabledRaw ?? "").toLowerCase() === "true";
+  const amountStr = String(s.reward_per_otp ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Accept up to 4 fractional digits (BDT typically 2, but allow precision).
+  const validate = (raw: string): { ok: boolean; value?: number; error?: string } => {
+    const v = raw.trim();
+    if (!v) return { ok: false, error: "Amount is required" };
+    if (!/^\d+(\.\d{1,4})?$/.test(v)) return { ok: false, error: "Use a decimal like 0.40 (max 4 decimals)" };
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0) return { ok: false, error: "Amount must be ≥ 0" };
+    if (n > 1000) return { ok: false, error: "Amount looks too high (>1000 BDT per OTP)" };
+    return { ok: true, value: n };
+  };
+
+  const saveAll = async () => {
+    const v = validate(amountStr);
+    if (!v.ok) { setError(v.error!); toast.error(v.error!); return; }
+    setError(null);
+    setSaving(true);
+    try {
+      await api.settings.set("reward_enabled", enabled ? "true" : "false");
+      await api.settings.set("reward_per_otp", v.value!.toFixed(2));
+      toast.success(`Rewards saved — ৳${v.value!.toFixed(2)} BDT per successful OTP (${enabled ? "ON" : "OFF"})`);
+    } catch (e: any) {
+      toast.error(e.message || "Failed to save rewards");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mb-6 glass-card p-5 border border-primary/30">
+      <div className="mb-1 flex items-center gap-2">
+        <span className="text-base">💰</span>
+        <h3 className="font-display text-base font-semibold">OTP Reward (BDT)</h3>
+      </div>
+      <p className="mb-4 text-xs text-muted-foreground">
+        Each successful IMS OTP delivered to a user credits this amount to their balance automatically.
+      </p>
+
+      <div className="grid gap-4 sm:grid-cols-[auto_1fr_auto] sm:items-end">
+        <div>
+          <div className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">Enabled</div>
+          <div className="flex items-center gap-2 h-9">
+            <Switch checked={enabled} onCheckedChange={(c) => setS({ ...s, reward_enabled: c ? "true" : "false" })} />
+            <span className={`text-xs font-medium ${enabled ? "text-emerald-400" : "text-muted-foreground"}`}>
+              {enabled ? "ON" : "OFF"}
+            </span>
+          </div>
+        </div>
+        <div>
+          <div className="mb-1 text-[10px] uppercase tracking-wider text-muted-foreground">Reward per OTP (BDT)</div>
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">৳</span>
+            <Input
+              inputMode="decimal"
+              placeholder="0.40"
+              className={`pl-7 font-mono ${error ? "border-destructive focus-visible:ring-destructive" : ""}`}
+              value={amountStr}
+              onChange={(e) => { setS({ ...s, reward_per_otp: e.target.value }); setError(null); }}
+              onBlur={() => { const v = validate(amountStr); setError(v.ok ? null : v.error!); }}
+            />
+          </div>
+          {error
+            ? <div className="mt-1 text-xs text-destructive">{error}</div>
+            : <div className="mt-1 text-xs text-muted-foreground">Default <span className="code-pill">0.40</span> · max 4 decimals</div>}
+        </div>
+        <Button onClick={saveAll} disabled={saving} className="h-9 bg-gradient-primary text-primary-foreground">
+          <Save className="mr-1 h-3.5 w-3.5" /> {saving ? "Saving…" : "Save rewards"}
+        </Button>
+      </div>
+    </div>
   );
 }
