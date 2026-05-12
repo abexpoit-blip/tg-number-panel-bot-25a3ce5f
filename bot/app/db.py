@@ -1,7 +1,7 @@
 """Shared SQLAlchemy session for the bot. Models mirror the backend schema."""
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -56,7 +56,7 @@ class TgUser(Base):
     username: Mapped[str | None] = mapped_column(String(120), nullable=True)
     first_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     is_banned: Mapped[bool] = mapped_column(Boolean, default=False)
-    balance: Mapped[int] = mapped_column(Integer, default=0)
+    balance: Mapped[float] = mapped_column(Float, default=0.0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
