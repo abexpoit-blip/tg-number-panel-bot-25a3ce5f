@@ -182,10 +182,6 @@ async def on_get_number(msg: Message):
     if not services:
         await msg.answer("No services available right now.")
         return
-    def _svc_btn(sv: Service) -> InlineKeyboardButton:
-        emo = (sv.emoji or "📱").strip()
-        nm = (sv.name or "Service").strip()
-        return InlineKeyboardButton(text=f"{emo} {nm}", callback_data=f"svc:{sv.id}")
     kb = InlineKeyboardMarkup(inline_keyboard=[[_svc_btn(sv)] for sv in services])
     await msg.answer("🗝 <b>Select a Service:</b>", reply_markup=kb)
 
