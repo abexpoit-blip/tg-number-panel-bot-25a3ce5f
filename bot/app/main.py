@@ -18,7 +18,7 @@ from aiogram.types import (
     Message,
     ReplyKeyboardMarkup,
 )
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
 from .config import settings
 from .db import Base, Country, CountryRange, Number, Otp, Service, SessionLocal, TgUser, engine
@@ -687,6 +687,39 @@ async def on_change_number(cb: CallbackQuery):
 
 # ============= OTP feed listener =============
 
+def _phone_match_filters(feed_phone: str):
+    """Match full numbers, suffix-only provider numbers, and masked feed prefixes."""
+    digits = "".join(ch for ch in (feed_phone or "") if ch.isdigit())
+    filters = [Number.phone == digits]
+    if len(digits) >= 9:
+        filters.append(Number.phone.like(f"%{digits[-9:]}"))
+    if len(digits) >= 6:
+        filters.append(Number.phone.like(f"{digits}%"))
+    return filters
+
+
+async def _find_assigned_number_for_otp(s, phone: str, service_hint: str | None) -> Number | None:
+    digits = "".join(ch for ch in (phone or "") if ch.isdigit())
+    if not digits:
+        return None
+    candidates = (await s.execute(
+        select(Number).where(
+            Number.assigned_user_id.is_not(None),
+            or_(*_phone_match_filters(digits)),
+        )
+    )).scalars().all()
+    if not candidates:
+        return None
+    if service_hint:
+        for n in candidates:
+            sv2 = (await s.execute(select(Service).where(Service.id == n.service_id))).scalar_one_or_none()
+            if sv2 and service_hint.lower() in (sv2.keyword or "").lower():
+                return n
+    exact = [n for n in candidates if n.phone == digits or n.phone.endswith(digits) or digits.endswith(n.phone)]
+    prefix = [n for n in candidates if len(digits) >= 6 and n.phone.startswith(digits)]
+    return (exact or prefix or candidates)[0]
+
+
 def _extract_copy_texts(message: Message) -> list[str]:
     out: list[str] = []
     if message.reply_markup and message.reply_markup.inline_keyboard:
@@ -716,26 +749,7 @@ async def on_feed_post(msg: Message):
     log.info("Parsed OTP phone=%s code=%s service=%s", parsed.phone, parsed.code, parsed.service_hint)
 
     async with SessionLocal() as s:
-        # Match by full phone OR last-9-digit suffix (IMS feeds may include/omit country code).
-        tail = parsed.phone[-9:] if len(parsed.phone) >= 9 else parsed.phone
-        candidates = (await s.execute(
-            select(Number).where(
-                Number.assigned_user_id.is_not(None),
-                Number.phone.like(f"%{tail}"),
-            )
-        )).scalars().all()
-        match = None
-        if candidates:
-            # Prefer service-keyword hint, then exact phone, else first.
-            if parsed.service_hint:
-                for n in candidates:
-                    sv2 = (await s.execute(select(Service).where(Service.id == n.service_id))).scalar_one_or_none()
-                    if sv2 and parsed.service_hint.lower() in (sv2.keyword or "").lower():
-                        match = n
-                        break
-            if match is None:
-                exact = [n for n in candidates if n.phone == parsed.phone or n.phone.endswith(parsed.phone) or parsed.phone.endswith(n.phone)]
-                match = (exact or candidates)[0]
+        match = await _find_assigned_number_for_otp(s, parsed.phone, parsed.service_hint)
         raw_text = text[:1000]
         event_key = otp_event_key(
             "feed",
@@ -751,7 +765,7 @@ async def on_feed_post(msg: Message):
             return
 
         if not match:
-            log.warning("Feed: no assigned number matched phone=%s (tail=%s)", parsed.phone, tail)
+            log.warning("Feed: no assigned number matched phone=%s", parsed.phone)
         if await otp_already_recorded(
             s,
             phone=parsed.phone,
