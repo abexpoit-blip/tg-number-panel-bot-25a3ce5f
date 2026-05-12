@@ -262,11 +262,7 @@ async def on_service_chosen(cb: CallbackQuery):
 async def back_to_services(cb: CallbackQuery):
     async with SessionLocal() as s:
         services = (await s.execute(select(Service).where(Service.enabled == True).order_by(Service.sort_order, Service.id))).scalars().all()
-    def _svc_btn(sv: Service) -> InlineKeyboardButton:
-        emo = (sv.emoji or "📱").strip()
-        nm = (sv.name or "Service").strip()
-        return InlineKeyboardButton(text=f"{emo} {nm}", callback_data=f"svc:{sv.id}")
-    kb = InlineKeyboardMarkup(inline_keyboard=[[_svc_btn(sv)] for sv in services])
+    kb = InlineKeyboardMarkup(inline_keyboard=[[svc_button(sv)] for sv in services])
     await cb.message.edit_text("🗝 <b>Select a Service:</b>", reply_markup=kb)
     await cb.answer()
 
