@@ -43,7 +43,7 @@ class TgUser(Base):
     username: Mapped[str | None] = mapped_column(String(120), nullable=True)
     first_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     is_banned: Mapped[bool] = mapped_column(Boolean, default=False)
-    balance: Mapped[int] = mapped_column(Integer, default=0)
+    balance: Mapped[float] = mapped_column(Float, default=0.0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
