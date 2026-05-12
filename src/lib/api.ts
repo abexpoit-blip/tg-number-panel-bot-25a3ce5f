@@ -178,6 +178,13 @@ export const api = {
   providers: {
     list: () => req<any[]>("/providers"),
   },
+  ranges: {
+    list: (country_id?: number) =>
+      req<any[]>(`/ranges${country_id ? `?country_id=${country_id}` : ""}`),
+    create: (b: any) => req("/ranges", { method: "POST", body: JSON.stringify(b) }),
+    update: (id: number, b: any) => req(`/ranges/${id}`, { method: "PUT", body: JSON.stringify(b) }),
+    remove: (id: number) => req(`/ranges/${id}`, { method: "DELETE" }),
+  },
   ims: {
     accounts: () => req<any[]>("/ims/accounts"),
     test: (slot: "1" | "2") =>
