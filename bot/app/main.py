@@ -16,7 +16,7 @@ from aiogram.types import (
     Message,
     ReplyKeyboardMarkup,
 )
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from .config import settings
 from .db import Base, Country, CountryRange, Number, Otp, Service, SessionLocal, TgUser, engine
