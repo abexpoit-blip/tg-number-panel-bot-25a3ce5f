@@ -10,7 +10,7 @@ from .config import settings
 from .db import Base, SessionLocal, engine
 from .models import Admin, Country, Provider, Service
 from .routes import auth as auth_routes
-from .routes import countries, dashboard, feed as feed_routes, ims, numbers, providers as providers_routes, ranges as ranges_routes, services, settings as settings_routes, sms, users, withdrawals
+from .routes import countries, dashboard, feed as feed_routes, ims, notices as notices_routes, numbers, providers as providers_routes, ranges as ranges_routes, services, settings as settings_routes, sms, users, withdrawals
 
 
 async def _ensure_columns(conn):
@@ -44,6 +44,16 @@ async def _ensure_columns(conn):
         # do not resend the same provider/feed OTP row again.
         "CREATE TABLE IF NOT EXISTS otp_delivery_events (event_key VARCHAR(128) PRIMARY KEY, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
         "ALTER TABLE otps ADD COLUMN IF NOT EXISTS raw_text TEXT DEFAULT ''",
+        # Admin broadcast notices log.
+        "CREATE TABLE IF NOT EXISTS notices ("
+        " id SERIAL PRIMARY KEY,"
+        " text TEXT NOT NULL,"
+        " target VARCHAR(16) NOT NULL DEFAULT 'both',"
+        " sent_count INTEGER NOT NULL DEFAULT 0,"
+        " failed_count INTEGER NOT NULL DEFAULT 0,"
+        " total_targets INTEGER NOT NULL DEFAULT 0,"
+        " status VARCHAR(16) NOT NULL DEFAULT 'done',"
+        " created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     ]
     from sqlalchemy import text
     for s in stmts:
@@ -149,6 +159,7 @@ app.include_router(ims.router, prefix="/ims", tags=["ims"])
 app.include_router(ranges_routes.router, prefix="/ranges", tags=["ranges"])
 app.include_router(providers_routes.router, prefix="/providers", tags=["providers"])
 app.include_router(feed_routes.router, prefix="/feed", tags=["feed"])
+app.include_router(notices_routes.router, prefix="/notices", tags=["notices"])
 
 
 @app.get("/health")

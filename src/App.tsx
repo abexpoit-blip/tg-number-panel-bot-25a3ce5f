@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import LiveOTP from "./pages/LiveOTP";
 import FeedChannels from "./pages/FeedChannels";
+import Notices from "./pages/Notices";
 import Numbers from "./pages/Numbers";
 import Services from "./pages/Services";
 import Providers from "./pages/Providers";
@@ -33,6 +34,7 @@ const App = () => (
           <Route path="/" element={<Shell><Dashboard /></Shell>} />
           <Route path="/otp" element={<Shell><LiveOTP /></Shell>} />
           <Route path="/feed" element={<Shell><FeedChannels /></Shell>} />
+          <Route path="/notices" element={<Shell><Notices /></Shell>} />
           <Route path="/numbers" element={<Shell><Numbers /></Shell>} />
           <Route path="/services" element={<Shell><Services /></Shell>} />
           <Route path="/providers" element={<Shell><Providers /></Shell>} />
