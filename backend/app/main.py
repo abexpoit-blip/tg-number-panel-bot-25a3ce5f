@@ -104,7 +104,7 @@ app.include_router(users.router, prefix="/users", tags=["users"])
 app.include_router(withdrawals.router, prefix="/withdrawals", tags=["withdrawals"])
 app.include_router(sms.router, prefix="/sms", tags=["sms"])
 app.include_router(settings_routes.router, prefix="/settings", tags=["settings"])
-app.include_router(providers.router, prefix="/providers", tags=["providers"])
+app.include_router(ims.router, prefix="/ims", tags=["ims"])
 
 
 @app.get("/health")
