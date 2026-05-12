@@ -36,6 +36,24 @@ class Country(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class CountryRange(Base):
+    """Sub-range of a country (e.g. 'Peru 1' covering numbers starting with 5198).
+
+    Bot shows ranges as a sub-step after the user picks the country, so a single
+    country can expose multiple labelled buckets.
+    """
+    __tablename__ = "country_ranges"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    country_id: Mapped[int] = mapped_column(ForeignKey("countries.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80))               # e.g. "Peru 1"
+    prefix: Mapped[str] = mapped_column(String(32), default="")  # informational, e.g. "5198"
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    country: Mapped[Country] = relationship(lazy="joined")
+
+
 class TgUser(Base):
     __tablename__ = "tg_users"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
