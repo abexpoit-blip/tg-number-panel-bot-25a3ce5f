@@ -148,6 +148,7 @@ app.include_router(settings_routes.router, prefix="/settings", tags=["settings"]
 app.include_router(ims.router, prefix="/ims", tags=["ims"])
 app.include_router(ranges_routes.router, prefix="/ranges", tags=["ranges"])
 app.include_router(providers_routes.router, prefix="/providers", tags=["providers"])
+app.include_router(feed_routes.router, prefix="/feed", tags=["feed"])
 
 
 @app.get("/health")
