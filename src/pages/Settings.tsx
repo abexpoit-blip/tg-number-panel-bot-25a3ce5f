@@ -23,6 +23,22 @@ const LABELS: Record<string, string> = {
   main_channel_emoji_id: "Main Channel button — premium emoji ID",
   number_channel_emoji_id: "Number Channel button — premium emoji ID",
   otp_button_emoji_id: "OTP code button — premium emoji ID",
+  // IMS account #1 (imssms.org)
+  ims_enabled: "IMS #1 — Enabled",
+  ims_base_url: "IMS #1 — Base URL",
+  ims_username: "IMS #1 — Username",
+  ims_password: "IMS #1 — Password",
+  ims_otp_interval: "IMS #1 — Poll interval (sec, min 16)",
+  ims_session_cookie: "IMS #1 — Saved PHPSESSID (auto)",
+  ims_cookie_header: "IMS #1 — Manual Cookie header (optional)",
+  // IMS account #2
+  ims2_enabled: "IMS #2 — Enabled",
+  ims2_base_url: "IMS #2 — Base URL",
+  ims2_username: "IMS #2 — Username",
+  ims2_password: "IMS #2 — Password",
+  ims2_otp_interval: "IMS #2 — Poll interval (sec, min 16)",
+  ims2_session_cookie: "IMS #2 — Saved PHPSESSID (auto)",
+  ims2_cookie_header: "IMS #2 — Manual Cookie header (optional)",
 };
 
 // Always-visible keys (so admin can configure even if empty in DB)
@@ -32,6 +48,12 @@ const ALWAYS_KEYS = [
   "main_channel_emoji_id",
   "number_channel_emoji_id",
   "otp_button_emoji_id",
+  // IMS #1
+  "ims_enabled", "ims_base_url", "ims_username", "ims_password",
+  "ims_otp_interval", "ims_session_cookie", "ims_cookie_header",
+  // IMS #2
+  "ims2_enabled", "ims2_base_url", "ims2_username", "ims2_password",
+  "ims2_otp_interval", "ims2_session_cookie", "ims2_cookie_header",
 ];
 
 export default function Settings() {
