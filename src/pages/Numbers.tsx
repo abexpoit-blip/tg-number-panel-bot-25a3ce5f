@@ -43,13 +43,20 @@ export default function Numbers() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { setPage(0); }, [JSON.stringify(filter)]);
 
+  const rangeBelongsToCountry = (rangeId: number, countryId: number) => {
+    if (!rangeId) return true;
+    const r = ranges.find((x) => x.id === rangeId);
+    return !!r && r.country_id === countryId;
+  };
   const addOne = async () => {
     if (!single.msisdn || !single.service_id || !single.country_id) return toast.error("Fill all fields");
+    if (!rangeBelongsToCountry(single.range_id, single.country_id)) return toast.error("Selected range does not belong to the chosen country");
     try { await api.numbers.create({ ...single, provider_id: single.provider_id || null, range_id: single.range_id || null }); setSingle({ ...single, msisdn: "" }); load(); toast.success("Number added"); }
     catch (e: any) { toast.error(e.message); }
   };
   const addBulk = async () => {
     if (!bulk.service_id || !bulk.country_id) return toast.error("Pick service + country");
+    if (!rangeBelongsToCountry(bulk.range_id, bulk.country_id)) return toast.error("Selected range does not belong to the chosen country");
     const arr = bulk.msisdns.split(/[\s,;]+/).filter(Boolean);
     if (!arr.length) return toast.error("Paste numbers");
     try {
