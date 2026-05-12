@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import current_admin
 from ..db import get_db
-from ..models import Number, Otp, Service, TgUser
+from ..models import Country, CountryRange, Number, Otp, Service, TgUser
 
 router = APIRouter()
 
