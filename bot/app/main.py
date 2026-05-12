@@ -175,7 +175,7 @@ async def on_start(msg: Message):
 @dp.message(F.text == "💰 Balance")
 async def on_balance(msg: Message):
     u = await ensure_user(msg.from_user)
-    await msg.answer(f"💰 Balance: <b>{u.balance}</b> credits\n\nThis service is currently <b>FREE</b>.")
+    await msg.answer(f"💰 Balance: <b>৳{float(u.balance or 0):.2f} BDT</b>")
 
 
 @dp.message(F.text == "📊 Status")

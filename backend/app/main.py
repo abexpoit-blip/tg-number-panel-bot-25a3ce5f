@@ -23,6 +23,12 @@ async def _ensure_columns(conn):
         "ALTER TABLE otps     ADD COLUMN IF NOT EXISTS provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL",
         "CREATE INDEX IF NOT EXISTS ix_numbers_provider_id ON numbers(provider_id)",
         "CREATE INDEX IF NOT EXISTS ix_otps_provider_id ON otps(provider_id)",
+        # Currency lockdown — this build is BDT-only.
+        "ALTER TABLE providers ALTER COLUMN currency SET DEFAULT 'BDT'",
+        "UPDATE providers SET currency='BDT' WHERE currency IS NULL OR currency IN ('EUR','USD','GBP','')",
+        # Balance now stores fractional BDT (e.g. 0.40 per OTP).
+        "ALTER TABLE tg_users ALTER COLUMN balance TYPE DOUBLE PRECISION USING balance::double precision",
+        "ALTER TABLE tg_users ALTER COLUMN balance SET DEFAULT 0",
     ]
     from sqlalchemy import text
     for s in stmts:
@@ -85,9 +91,15 @@ async def lifespan(app: FastAPI):
                     base_url="https://www.imssms.org",
                     username="",
                     password="",
-                    currency="EUR",
+                    currency="BDT",
                     enabled=True,
                 ))
+        # seed default reward settings (BDT, paid per successful OTP delivery)
+        from .models import Setting
+        existing_settings = {r.key for r in (await s.execute(select(Setting))).scalars().all()}
+        for k, v in (("reward_enabled", "true"), ("reward_per_otp", "0.40")):
+            if k not in existing_settings:
+                s.add(Setting(key=k, value=v))
         try:
             await s.commit()
         except IntegrityError:

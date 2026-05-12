@@ -23,7 +23,7 @@ def _d(u: TgUser):
 
 
 class AdjustIn(BaseModel):
-    delta: int
+    delta: float
 
 
 @router.get("")
@@ -41,7 +41,7 @@ async def adjust(uid: int, body: AdjustIn, _: object = Depends(current_admin), d
     u = (await db.execute(select(TgUser).where(TgUser.id == uid))).scalar_one_or_none()
     if not u:
         raise HTTPException(404)
-    u.balance = max(0, u.balance + body.delta)
+    u.balance = max(0.0, float(u.balance or 0) + float(body.delta))
     await db.commit()
     return _d(u)
 

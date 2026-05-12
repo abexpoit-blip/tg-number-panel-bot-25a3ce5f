@@ -43,7 +43,7 @@ export default function Withdrawals() {
                   <div className="font-medium">{w.first_name} {w.username && <span className="text-muted-foreground">@{w.username}</span>}</div>
                   <div className="mt-1"><span className="code-pill">{w.user_id}</span></div>
                 </td>
-                <td><span className="font-mono text-base font-semibold text-success">${Number(w.amount).toFixed(2)}</span></td>
+                <td><span className="font-mono text-base font-semibold text-success">৳{Number(w.amount).toFixed(2)} <span className="text-xs text-muted-foreground">BDT</span></span></td>
                 <td><span className="pill-neutral uppercase">{w.method}</span></td>
                 <td><span className="code-pill max-w-[220px] truncate">{w.address}</span></td>
                 <td><span className={statusPill[w.status] || "pill-neutral"}>{w.status}</span></td>

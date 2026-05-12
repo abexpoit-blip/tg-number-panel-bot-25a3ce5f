@@ -62,7 +62,7 @@ export default function Dashboard() {
   const value = (k: string) => {
     if (!s) return "—";
     if (k === "numbers") return `${s.numbers_available ?? 0}/${s.numbers_total ?? 0}`;
-    if (k === "paid_total") return `$${Number(s.paid_total ?? 0).toFixed(0)}`;
+    if (k === "paid_total") return `৳${Number(s.paid_total ?? 0).toFixed(2)}`;
     return String((s as any)[k] ?? 0);
   };
 

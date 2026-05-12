@@ -102,7 +102,7 @@ export default function Numbers() {
               <SelectTrigger><SelectValue placeholder="Provider (optional)" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="0">— No provider —</SelectItem>
-                {providers.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.name} ({p.currency})</SelectItem>)}
+                {providers.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -124,7 +124,7 @@ export default function Numbers() {
               <SelectTrigger><SelectValue placeholder="Provider" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="0">— No provider —</SelectItem>
-                {providers.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.name} ({p.currency})</SelectItem>)}
+                {providers.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
