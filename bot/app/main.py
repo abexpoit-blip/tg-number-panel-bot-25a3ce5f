@@ -229,6 +229,27 @@ async def on_countries(msg: Message):
 
 # --------- Get Number flow ---------
 
+async def _services_with_available_numbers(s) -> list[Service]:
+    """Return enabled services that have at least one available number
+    (enabled, unassigned, in an enabled range or un-ranged)."""
+    rows = (await s.execute(
+        select(Service)
+        .join(Number, Number.service_id == Service.id)
+        .outerjoin(
+            CountryRange,
+            (CountryRange.id == Number.range_id) & (CountryRange.enabled == True),  # noqa: E712
+        )
+        .where(
+            Service.enabled == True,  # noqa: E712
+            Number.enabled == True,  # noqa: E712
+            Number.assigned_user_id.is_(None),
+            (Number.range_id.is_(None)) | (CountryRange.id.is_not(None)),
+        )
+        .group_by(Service.id)
+        .order_by(Service.sort_order, Service.id)
+    )).scalars().all()
+    return list(rows)
+
 @dp.message(F.text == "🤖 Get Number")
 async def on_get_number(msg: Message):
     u = await ensure_user(msg.from_user)
