@@ -37,11 +37,11 @@ export default function Services() {
       <PageHeader title="Services" subtitle="WhatsApp, Facebook, Instagram, Telegram…" />
 
       <div className="glass-card mb-6 p-5">
-        <div className="grid gap-3 sm:grid-cols-[100px_1fr_80px_180px_80px_auto_auto]">
+        <div className="grid gap-3 sm:grid-cols-[100px_1fr_120px_180px_80px_auto_auto]">
           <Input placeholder="code" value={draft.code} onChange={(e) => setDraft({ ...draft, code: e.target.value })} />
           <Input placeholder="name" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-          <Input placeholder="emoji" value={draft.emoji} onChange={(e) => setDraft({ ...draft, emoji: e.target.value })} />
-          <EmojiIdField value={draft.custom_emoji_id} onChange={(v) => setDraft({ ...draft, custom_emoji_id: v })} className="h-9 w-full font-mono text-xs" placeholder="premium emoji ID" />
+          <Input placeholder="🟢 button icon" title="Unicode emoji shown on the inline button" value={draft.emoji} onChange={(e) => setDraft({ ...draft, emoji: e.target.value })} />
+          <EmojiIdField value={draft.custom_emoji_id} onChange={(v) => setDraft({ ...draft, custom_emoji_id: v })} className="h-9 w-full font-mono text-xs" placeholder="premium emoji ID (msg text)" />
           <Input type="number" placeholder="sort" value={draft.sort_order} onChange={(e) => setDraft({ ...draft, sort_order: +e.target.value })} />
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
             <Switch checked={draft.enabled} onCheckedChange={(v) => setDraft({ ...draft, enabled: v })} /> enabled
@@ -49,7 +49,8 @@ export default function Services() {
           <Button onClick={create} className="bg-gradient-primary text-primary-foreground"><Plus className="mr-1 h-4 w-4" /> Add</Button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          💎 <b>Premium emoji ID</b>: send the exact emoji from <a className="underline" href="https://t.me/addemoji/ApplicationEmoji" target="_blank" rel="noreferrer">ApplicationEmoji</a> to <code>@RawDataBot</code>, copy <code>custom_emoji_id</code> from the JSON, and paste it here. The bot renders it via <code>&lt;tg-emoji&gt;</code> in message text.
+          🔘 <b>Button Icon</b>: a plain unicode emoji (🟢 🔵 🟣 ✈️ 🎵 …) shown on the inline service button. Telegram does <em>not</em> render premium emojis inside buttons.<br />
+          💎 <b>Premium emoji ID</b>: forward the emoji from <a className="underline" href="https://t.me/addemoji/ApplicationEmoji" target="_blank" rel="noreferrer">ApplicationEmoji</a> to <code>@RawDataBot</code>, copy <code>custom_emoji_id</code>, paste here. Used in message text via <code>&lt;tg-emoji&gt;</code>.
         </p>
       </div>
 
