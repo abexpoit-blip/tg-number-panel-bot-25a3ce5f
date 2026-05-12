@@ -61,11 +61,13 @@ async function fetchCharts(): Promise<ChartData | null> {
 export default function Dashboard() {
   const [s, setS] = useState<Stats | null>(null);
   const [charts, setCharts] = useState<ChartData | null>(null);
+  const [rangeStats, setRangeStats] = useState<RangeStat[]>([]);
 
   useEffect(() => {
     const load = () => {
       api.dashboard().then(setS).catch(() => setS({}));
       fetchCharts().then(setCharts);
+      api.rangeStats().then(setRangeStats).catch(() => setRangeStats([]));
     };
     load();
     const t = setInterval(load, 15000);
