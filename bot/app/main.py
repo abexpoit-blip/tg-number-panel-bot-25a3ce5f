@@ -132,6 +132,40 @@ def svc_button(sv: Service) -> InlineKeyboardButton:
     return InlineKeyboardButton(text=f"{emo} {nm}", callback_data=f"svc:{sv.id}")
 
 
+@dp.callback_query(F.data.startswith("dl:"))
+async def on_download_otps(cb: CallbackQuery):
+    """Send all (number|otp) pairs the user has received in this svc+country(+range) as a .txt file."""
+    svc_id, ctry_id, rng_id = _parse_svc_ctry_rng(cb.data)
+    u = await ensure_user(cb.from_user)
+    async with SessionLocal() as s:
+        stmt = select(Number).where(
+            Number.assigned_user_id == u.id,
+            Number.service_id == svc_id,
+            Number.country_id == ctry_id,
+            Number.last_otp.is_not(None),
+        )
+        if rng_id is not None:
+            stmt = stmt.where(Number.range_id == rng_id)
+        nums = (await s.execute(stmt)).scalars().all()
+        sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one_or_none()
+        ctry = (await s.execute(select(Country).where(Country.id == ctry_id))).scalar_one_or_none()
+
+    if not nums:
+        await cb.answer("No OTPs received yet.", show_alert=True)
+        return
+
+    lines = [f"+{n.phone}|{n.last_otp}" for n in nums]
+    content = ("\n".join(lines) + "\n").encode("utf-8")
+
+    svc_slug = (sv.keyword or sv.name or "service").lower().replace(" ", "_") if sv else "service"
+    ctry_slug = (ctry.iso or ctry.name or "country").lower().replace(" ", "_") if ctry else "country"
+    fname = f"otps_{svc_slug}_{ctry_slug}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.txt"
+
+    file = BufferedInputFile(content, filename=fname)
+    await cb.message.answer_document(file, caption=f"📥 {len(nums)} OTP(s) — format: <code>+number|otp</code>")
+    await cb.answer("Sent!")
+
+
 
 # ============= UI =============
 
