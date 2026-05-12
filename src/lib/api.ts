@@ -106,6 +106,7 @@ export const api = {
     pending_withdrawals: s.pending_withdrawals ?? 0,
     paid_total: s.paid_total ?? 0,
   })),
+  rangeStats: () => req<Array<{ country_id: number; country_name: string; country_flag: string; country_code: string; range_id: number | null; range_name: string | null; label: string; total: number; assigned: number; available: number; }>>("/dashboard/range-stats"),
   settings: {
     list: () => req<Record<string, any>>("/settings"),
     set: (key: string, value: any) =>

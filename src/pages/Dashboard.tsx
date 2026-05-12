@@ -21,6 +21,19 @@ interface ChartData {
   top_services: { name: string; emoji: string; count: number }[];
 }
 
+interface RangeStat {
+  country_id: number;
+  country_name: string;
+  country_flag: string;
+  country_code: string;
+  range_id: number | null;
+  range_name: string | null;
+  label: string;
+  total: number;
+  assigned: number;
+  available: number;
+}
+
 const STATS = [
   { key: "users", label: "Total users", icon: Users, accent: "from-primary to-primary-glow", glow: "shadow-glow" },
   { key: "numbers", label: "Numbers in pool", icon: Phone, accent: "from-primary to-accent", glow: "" },
@@ -48,11 +61,13 @@ async function fetchCharts(): Promise<ChartData | null> {
 export default function Dashboard() {
   const [s, setS] = useState<Stats | null>(null);
   const [charts, setCharts] = useState<ChartData | null>(null);
+  const [rangeStats, setRangeStats] = useState<RangeStat[]>([]);
 
   useEffect(() => {
     const load = () => {
       api.dashboard().then(setS).catch(() => setS({}));
       fetchCharts().then(setCharts);
+      api.rangeStats().then(setRangeStats).catch(() => setRangeStats([]));
     };
     load();
     const t = setInterval(load, 15000);
@@ -211,6 +226,67 @@ export default function Dashboard() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+          </div>
+
+          {/* Per-range breakdown */}
+          <div className="glass-card p-5 mt-4 animate-fade-in-up" style={{ animationDelay: "600ms" }}>
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-display text-base font-semibold flex items-center gap-2">
+                  <Radio className="h-4 w-4 text-primary" />
+                  Country &amp; range breakdown
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Each range (Peru 1, Peru 2…) shown separately · assigned / total</p>
+              </div>
+              <div className="text-xs text-muted-foreground">{rangeStats.length} buckets</div>
+            </div>
+            {rangeStats.length === 0 ? (
+              <div className="text-xs text-muted-foreground py-8 text-center">No numbers in pool yet</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
+                      <th className="py-2 pr-4 font-medium">Country / range</th>
+                      <th className="py-2 pr-4 font-medium text-right">Total</th>
+                      <th className="py-2 pr-4 font-medium text-right">Assigned</th>
+                      <th className="py-2 pr-4 font-medium text-right">Available</th>
+                      <th className="py-2 pr-0 font-medium w-40">Usage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rangeStats.map((r) => {
+                      const pct = r.total > 0 ? Math.round((r.assigned / r.total) * 100) : 0;
+                      return (
+                        <tr key={`${r.country_id}-${r.range_id ?? 0}`} className="border-t border-border/50">
+                          <td className="py-2 pr-4">
+                            <span className="mr-1.5 text-base">{r.country_flag}</span>
+                            <span className="font-medium">{r.country_name}</span>
+                            {r.range_name ? (
+                              <span className="ml-1.5 inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{r.range_name}</span>
+                            ) : (
+                              <span className="ml-1.5 text-xs text-muted-foreground">(no range)</span>
+                            )}
+                            <span className="ml-2 text-xs text-muted-foreground">+{r.country_code}</span>
+                          </td>
+                          <td className="py-2 pr-4 text-right font-mono tabular-nums">{r.total}</td>
+                          <td className="py-2 pr-4 text-right font-mono tabular-nums text-accent">{r.assigned}</td>
+                          <td className="py-2 pr-4 text-right font-mono tabular-nums text-success">{r.available}</td>
+                          <td className="py-2 pr-0">
+                            <div className="flex items-center gap-2">
+                              <div className="h-1.5 flex-1 bg-muted/50 rounded-full overflow-hidden">
+                                <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-xs text-muted-foreground tabular-nums w-9 text-right">{pct}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </>
       )}

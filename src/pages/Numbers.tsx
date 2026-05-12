@@ -207,7 +207,7 @@ export default function Numbers() {
                 <td className="text-muted-foreground">#{n.id}</td>
                 <td><span className="code-pill">+{n.msisdn}</span></td>
                 <td><ServiceBadge service={{ name: n.service_name, code: n.service_keyword }} /></td>
-                <td><span className="mr-1 text-lg">{n.country_flag}</span>{n.country_name}</td>
+                <td><span className="mr-1 text-lg">{n.country_flag}</span>{n.country_name}{n.range_name ? <span className="ml-1 text-xs text-muted-foreground">· {n.range_name}</span> : null}</td>
                 <td><span className={statusPill[n.status] || "pill-neutral"}>{n.status}</span></td>
                 <td className="text-muted-foreground">{n.last_otp_at ? new Date(n.last_otp_at).toLocaleString() : "—"}</td>
                 <td className="text-right">
