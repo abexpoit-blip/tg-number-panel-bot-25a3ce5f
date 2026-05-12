@@ -205,4 +205,20 @@ export const api = {
     clearSession: (slot: "1" | "2") =>
       req<{ ok: boolean }>(`/ims/${slot}/clear-session`, { method: "POST" }),
   },
+  feed: {
+    channels: () =>
+      req<{
+        channels: Array<{
+          id: number;
+          ok: boolean;
+          title?: string;
+          username?: string | null;
+          type?: string;
+          members?: number | null;
+          error?: string | null;
+        }>;
+        raw: string;
+        total_otps: number;
+      }>("/feed/channels"),
+  },
 };
