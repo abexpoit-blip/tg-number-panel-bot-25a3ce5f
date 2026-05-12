@@ -749,26 +749,7 @@ async def on_feed_post(msg: Message):
     log.info("Parsed OTP phone=%s code=%s service=%s", parsed.phone, parsed.code, parsed.service_hint)
 
     async with SessionLocal() as s:
-        # Match by full phone OR last-9-digit suffix (IMS feeds may include/omit country code).
-        tail = parsed.phone[-9:] if len(parsed.phone) >= 9 else parsed.phone
-        candidates = (await s.execute(
-            select(Number).where(
-                Number.assigned_user_id.is_not(None),
-                Number.phone.like(f"%{tail}"),
-            )
-        )).scalars().all()
-        match = None
-        if candidates:
-            # Prefer service-keyword hint, then exact phone, else first.
-            if parsed.service_hint:
-                for n in candidates:
-                    sv2 = (await s.execute(select(Service).where(Service.id == n.service_id))).scalar_one_or_none()
-                    if sv2 and parsed.service_hint.lower() in (sv2.keyword or "").lower():
-                        match = n
-                        break
-            if match is None:
-                exact = [n for n in candidates if n.phone == parsed.phone or n.phone.endswith(parsed.phone) or parsed.phone.endswith(n.phone)]
-                match = (exact or candidates)[0]
+        match = await _find_assigned_number_for_otp(s, parsed.phone, parsed.service_hint)
         raw_text = text[:1000]
         event_key = otp_event_key(
             "feed",
@@ -784,7 +765,7 @@ async def on_feed_post(msg: Message):
             return
 
         if not match:
-            log.warning("Feed: no assigned number matched phone=%s (tail=%s)", parsed.phone, tail)
+            log.warning("Feed: no assigned number matched phone=%s", parsed.phone)
         if await otp_already_recorded(
             s,
             phone=parsed.phone,
