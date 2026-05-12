@@ -77,3 +77,48 @@ async def dashboard_charts(_: object = Depends(current_admin), db: AsyncSession 
     daily_list = [{"day": k, "count": v} for k, v in daily.items()]
 
     return {"hourly": hourly, "daily": daily_list, "top_services": top_services}
+
+
+@router.get("/dashboard/range-stats")
+async def dashboard_range_stats(_: object = Depends(current_admin), db: AsyncSession = Depends(get_db)):
+    """Per-(country, range) breakdown: total / assigned / available numbers.
+
+    Each country range (Peru 1, Peru 2, ...) shows up as its own row, plus a
+    pseudo-row for un-ranged numbers (range_id IS NULL) labelled just by country.
+    """
+    rows = (await db.execute(
+        select(
+            Country.id.label("cid"),
+            Country.name.label("cname"),
+            Country.flag.label("cflag"),
+            Country.code.label("ccode"),
+            CountryRange.id.label("rid"),
+            CountryRange.name.label("rname"),
+            CountryRange.sort_order.label("rsort"),
+            func.count(Number.id).label("total"),
+            func.count(Number.assigned_user_id).label("assigned"),
+        )
+        .select_from(Number)
+        .join(Country, Country.id == Number.country_id)
+        .outerjoin(CountryRange, CountryRange.id == Number.range_id)
+        .group_by(Country.id, CountryRange.id)
+    )).all()
+
+    out = []
+    for r in rows:
+        total = int(r.total or 0)
+        assigned = int(r.assigned or 0)
+        out.append({
+            "country_id": r.cid,
+            "country_name": r.cname,
+            "country_flag": r.cflag,
+            "country_code": r.ccode,
+            "range_id": r.rid,
+            "range_name": r.rname,
+            "label": (f"{r.cname} {r.rname}" if r.rname else r.cname),
+            "total": total,
+            "assigned": assigned,
+            "available": total - assigned,
+        })
+    out.sort(key=lambda x: (x["country_name"].lower(), 0 if x["range_id"] is None else 1, x["range_name"] or ""))
+    return out
