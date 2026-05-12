@@ -239,7 +239,8 @@ async def back_to_services(cb: CallbackQuery):
         nm = (sv.name or "Service").strip()
         return InlineKeyboardButton(text=f"{emo} {nm}", callback_data=f"svc:{sv.id}")
     kb = InlineKeyboardMarkup(inline_keyboard=[[_svc_btn(sv)] for sv in services])
-    await cb.message.edit_text("🗝 <b>Select a Service:</b>", reply_markup=kb)
+    service_lines = "\n".join(f"{emoji_html(sv)} <b>{sv.name}</b>" for sv in services)
+    await cb.message.edit_text(f"🗝 <b>Select a Service:</b>\n\n{service_lines}", reply_markup=kb)
     await cb.answer()
 
 
