@@ -21,7 +21,7 @@ export default function Services() {
 
   const create = async () => {
     if (!draft.code || !draft.name) return toast.error("Code and name required");
-    try { await api.services.create(draft); setDraft({ code: "", name: "", emoji: "📱", custom_emoji_id: "", enabled: true, sort_order: 0 }); load(); toast.success("Service added"); }
+    try { await api.services.create(draft); setDraft({ code: "", name: "", emoji: "📱", custom_emoji_id: "", icon_mode: "auto", enabled: true, sort_order: 0 }); load(); toast.success("Service added"); }
     catch (e: any) { toast.error(e.message); }
   };
   const save = async (s: Service) => {
@@ -32,6 +32,13 @@ export default function Services() {
   };
   const del = async (id: number) => { if (!confirm("Delete service?")) return; try { await api.services.remove(id); toast.success("Deleted"); load(); } catch (e: any) { toast.error(e.message); } };
   const patch = (id: number, k: keyof Service, v: any) => setList(list.map((x) => x.id === id ? { ...x, [k]: v } : x));
+
+  const ICON_MODES: { value: IconMode; label: string; hint: string }[] = [
+    { value: "auto", label: "Auto", hint: "Use custom emoji if set, otherwise brand-mapped" },
+    { value: "custom", label: "Custom", hint: "Always use the emoji field below" },
+    { value: "brand", label: "Brand", hint: "Auto-pick from brand map (WhatsApp→🟢, FB→🔵…)" },
+    { value: "default", label: "Default", hint: "Always show 📱" },
+  ];
 
   return (
     <>
