@@ -40,6 +40,9 @@ async def _ensure_columns(conn):
         "DROP INDEX IF EXISTS uq_phone_service_norange",
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_phone_service_range ON numbers(phone, service_id, country_id, range_id) WHERE range_id IS NOT NULL",
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_phone_service_norange ON numbers(phone, service_id, country_id) WHERE range_id IS NULL",
+        # Persistent idempotency guard used by the bot so restarts/code updates
+        # do not resend the same provider/feed OTP row again.
+        "CREATE TABLE IF NOT EXISTS otp_delivery_events (event_key VARCHAR(128) PRIMARY KEY, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     ]
     from sqlalchemy import text
     for s in stmts:

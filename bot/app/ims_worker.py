@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import select
 
 from .db import Country, Number, Otp, SessionLocal, Service, Setting, TgUser, get_setting
+from .idempotency import claim_otp_event, otp_already_recorded, otp_event_key
 from .scrapers.ims import (
     DEFAULT_INTERVAL,
     MIN_INTERVAL_FLOOR,
@@ -160,16 +161,33 @@ async def _deliver(bot: "Bot", row: ImsRow) -> bool:
     code = row.extract_code()
     if not code:
         return False
-    if not _DEDUP.add(row.dedup_key()):
+    dedup_key = row.dedup_key()
+    if not _DEDUP.add(dedup_key):
         return False
 
     slug = _service_slug_from_text(row.cli, row.message)
     match = await _match_number(row.phone, slug)
 
     async with SessionLocal() as s:
+        event_key = otp_event_key("ims", row.datetime, row.phone, row.cli, row.message, code)
+        if not await claim_otp_event(s, event_key):
+            await s.rollback()
+            log.info("IMS duplicate ignored phone=%s code=%s", row.phone, code)
+            return False
+        raw_text = (row.message or "")[:1000]
+        if await otp_already_recorded(
+            s,
+            phone=row.phone,
+            code=code,
+            raw_text=raw_text,
+            matched_number_id=(match.id if match else None),
+        ):
+            await s.commit()
+            log.info("IMS already recorded; skipping send phone=%s code=%s", row.phone, code)
+            return False
         otp = Otp(
             phone=row.phone, code=code,
-            raw_text=(row.message or "")[:1000],
+            raw_text=raw_text,
             service_hint=row.cli or slug,
         )
         user: TgUser | None = None

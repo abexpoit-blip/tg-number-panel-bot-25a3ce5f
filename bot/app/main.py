@@ -22,6 +22,7 @@ from sqlalchemy import func, select
 from .config import settings
 from .db import Base, Country, CountryRange, Number, Otp, Service, SessionLocal, TgUser, engine
 from .emoji import flag_emoji_html, service_emoji_html
+from .idempotency import claim_otp_event, otp_already_recorded, otp_event_key
 from .parser import parse_message
 from .ims_worker import ims_main
 
@@ -61,6 +62,7 @@ async def init_db() -> None:
             "DROP INDEX IF EXISTS uq_phone_service",
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_phone_service_range ON numbers(phone, service_id, country_id, range_id) WHERE range_id IS NOT NULL",
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_phone_service_norange ON numbers(phone, service_id, country_id) WHERE range_id IS NULL",
+            "CREATE TABLE IF NOT EXISTS otp_delivery_events (event_key VARCHAR(128) PRIMARY KEY, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
         ]:
             try:
                 await conn.execute(text(stmt))
@@ -679,12 +681,36 @@ async def on_feed_post(msg: Message):
             if match is None:
                 exact = [n for n in candidates if n.phone == parsed.phone or n.phone.endswith(parsed.phone) or parsed.phone.endswith(n.phone)]
                 match = (exact or candidates)[0]
+        raw_text = text[:1000]
+        event_key = otp_event_key(
+            "feed",
+            msg.message_id,
+            msg.chat.id,
+            parsed.phone,
+            parsed.code,
+            raw_text,
+        )
+        if not await claim_otp_event(s, event_key):
+            await s.rollback()
+            log.info("Feed duplicate ignored phone=%s code=%s", parsed.phone, parsed.code)
+            return
+
         if not match:
             log.warning("Feed: no assigned number matched phone=%s (tail=%s)", parsed.phone, tail)
+        if await otp_already_recorded(
+            s,
+            phone=parsed.phone,
+            code=parsed.code,
+            raw_text=raw_text,
+            matched_number_id=(match.id if match else None),
+        ):
+            await s.commit()
+            log.info("Feed already recorded; skipping send phone=%s code=%s", parsed.phone, parsed.code)
+            return
         otp_row = Otp(
             phone=parsed.phone,
             code=parsed.code,
-            raw_text=text[:1000],
+            raw_text=raw_text,
             service_hint=parsed.service_hint,
         )
         svc = None
