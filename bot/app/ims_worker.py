@@ -159,9 +159,9 @@ async def _match_number(phone: str, slug_hint: str | None) -> Number | None:
 async def _deliver(bot: "Bot", row: ImsRow) -> bool:
     code = row.extract_code()
     if not code:
-        return
+        return False
     if not _DEDUP.add(row.dedup_key()):
-        return
+        return False
 
     slug = _service_slug_from_text(row.cli, row.message)
     match = await _match_number(row.phone, slug)
@@ -189,7 +189,7 @@ async def _deliver(bot: "Bot", row: ImsRow) -> bool:
 
     if not (match and user and not user.is_banned):
         log.info("OTP %s for %s — no live assignment, parked", code, row.phone)
-        return
+        return True
 
     from .delivery import send_otp_message
     ok = await send_otp_message(user.tg_id, phone=row.phone, code=code, service=svc, country=ctry)
@@ -197,6 +197,7 @@ async def _deliver(bot: "Bot", row: ImsRow) -> bool:
         log.info("✓ delivered OTP %s → tg=%s phone=%s", code, user.tg_id, row.phone)
     else:
         log.warning("delivery failed user=%s phone=%s", user.tg_id, row.phone)
+    return True
 
 
 async def _run_account(bot: "Bot", label: str, prefix: str) -> None:
