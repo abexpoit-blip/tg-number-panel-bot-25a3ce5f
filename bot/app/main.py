@@ -215,7 +215,7 @@ async def on_get_number(msg: Message):
     if not services:
         await msg.answer("No services available right now.")
         return
-    kb = InlineKeyboardMarkup(inline_keyboard=[[_svc_btn(sv)] for sv in services])
+    kb = InlineKeyboardMarkup(inline_keyboard=[[svc_button(sv)] for sv in services])
     await msg.answer("🗝 <b>Select a Service:</b>", reply_markup=kb)
 
 
