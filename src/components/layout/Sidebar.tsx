@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Zap, LayoutDashboard, Radio, Phone, Layers, Globe, Users, Wallet, Settings as SettingsIcon, LogOut, Plug, Sparkles, Hash, Megaphone } from "lucide-react";
+import { Zap, LayoutDashboard, Radio, Phone, Layers, Globe, Users, Wallet, Settings as SettingsIcon, LogOut, Plug, Sparkles, Hash, Megaphone, Bell } from "lucide-react";
 import { setToken } from "@/lib/api";
 
 const LINKS = [
