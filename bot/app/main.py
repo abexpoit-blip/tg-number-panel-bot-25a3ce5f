@@ -89,16 +89,34 @@ _BRAND_EMOJI = {
 }
 
 
-def service_btn_emoji(sv: Service) -> str:
-    """Pick a simple unicode emoji for an inline button (premium emojis don't render in buttons)."""
-    raw = (getattr(sv, "emoji", None) or "").strip()
-    if raw and not raw.isdigit():
-        return raw
-    key = f"{(sv.code or '')} {(sv.name or '')}".lower()
+def _brand_emoji_for(sv: Service) -> str | None:
+    key = f"{(getattr(sv, 'keyword', '') or '')} {(sv.name or '')}".lower()
     for k, v in _BRAND_EMOJI.items():
         if k in key:
             return v
-    return "📱"
+    return None
+
+
+def service_btn_emoji(sv: Service) -> str:
+    """Pick a simple unicode emoji for the inline button based on icon_mode.
+
+    Modes: custom (use sv.emoji) | brand (auto pick from brand map) | default (📱) | auto (custom > brand > default).
+    Premium custom emojis don't render inside Telegram inline buttons, so we always
+    use a plain unicode glyph here.
+    """
+    mode = (getattr(sv, "icon_mode", None) or "auto").lower()
+    raw = (getattr(sv, "emoji", None) or "").strip()
+    brand = _brand_emoji_for(sv)
+    if mode == "custom":
+        return raw or "📱"
+    if mode == "brand":
+        return brand or raw or "📱"
+    if mode == "default":
+        return "📱"
+    # auto
+    if raw and raw != "📱":
+        return raw
+    return brand or "📱"
 
 
 def svc_button(sv: Service) -> InlineKeyboardButton:
