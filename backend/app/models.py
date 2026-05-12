@@ -20,6 +20,7 @@ class Service(Base):
     keyword: Mapped[str] = mapped_column(String(80), index=True)
     emoji: Mapped[str] = mapped_column(String(16), default="📱")
     custom_emoji_id: Mapped[str | None] = mapped_column(String(64), nullable=True)  # Telegram premium emoji
+    icon_mode: Mapped[str] = mapped_column(String(16), default="auto")  # auto | custom | brand | default
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
