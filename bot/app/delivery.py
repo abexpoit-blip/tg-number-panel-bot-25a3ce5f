@@ -140,3 +140,94 @@ async def _send_fallback(sess: aiohttp.ClientSession, chat_id: int, text: str, c
             log.error("Fallback sendMessage also failed: %s", data)
             return False
         return True
+
+
+def _mask_phone(phone: str, keep: int = 8) -> str:
+    """Mask the trailing digits of a phone number, keeping the leading prefix.
+
+    Example: 639979167712 -> 63997916XXXX
+    """
+    digits = "".join(ch for ch in phone if ch.isdigit())
+    if len(digits) <= keep:
+        return phone
+    return digits[:keep] + "X" * (len(digits) - keep)
+
+
+async def post_to_public_feed(
+    *,
+    phone: str,
+    service: Service | None,
+    country: Country | None,
+) -> None:
+    """Re-post a teaser of every received OTP to public feed channel(s).
+
+    The OTP code itself is NEVER posted — only a masked number + service +
+    country flag, plus optional Bot/Support buttons.  This lets users see
+    which ranges are active without exposing real OTPs.
+    Channel IDs come from the `public_feed_channel_ids` setting (comma list).
+    """
+    if not settings.BOT_TOKEN:
+        return
+    raw = (await get_setting("public_feed_channel_ids", "")).strip()
+    if not raw:
+        return
+    ids: list[int] = []
+    for chunk in raw.replace(";", ",").split(","):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        try:
+            ids.append(int(chunk))
+        except ValueError:
+            log.warning("Invalid public feed channel id: %r", chunk)
+    if not ids:
+        return
+
+    flag = flag_emoji_html(country)
+    emoji = service_emoji_html(service)
+    iso = (country.iso or "").upper() if country else ""
+    svc_name = (service.name or service.keyword or "").upper() if service else ""
+    masked = _mask_phone(phone, keep=8)
+    parts = [flag]
+    if iso:
+        parts.append(f" {iso} •")
+    parts.append(f" {emoji} <code>{masked}</code>")
+    if svc_name:
+        parts.append(f" • <b>{svc_name}</b>")
+    text = "".join(parts)
+
+    bot_url = (await get_setting("bot_pnl_url", "")) or (await get_setting("main_channel_url", ""))
+    support_url = (await get_setting("support_url", "")) or (await get_setting("number_channel_url", ""))
+    bottom: list[dict[str, Any]] = []
+    if bot_url:
+        bottom.append({"text": "‼️ Bot Pnl", "url": bot_url})
+    if support_url:
+        bottom.append({"text": "♻️ All Support", "url": support_url})
+    keyboard: list[list[dict[str, Any]]] = []
+    if bottom:
+        keyboard.append(bottom)
+
+    payload_base = {
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True,
+    }
+    if keyboard:
+        payload_base["reply_markup"] = {"inline_keyboard": keyboard}
+
+    url = f"{API_BASE}/bot{settings.BOT_TOKEN}/sendMessage"
+    try:
+        timeout = aiohttp.ClientTimeout(total=15)
+        async with aiohttp.ClientSession(timeout=timeout) as sess:
+            for cid in ids:
+                payload = dict(payload_base, chat_id=cid)
+                try:
+                    async with sess.post(url, json=payload) as r:
+                        data = await r.json(content_type=None)
+                        if not data.get("ok"):
+                            log.warning("public feed post failed chat=%s: %s", cid, data)
+                except Exception as e:
+                    log.warning("public feed post error chat=%s: %s", cid, e)
+    except Exception as e:
+        log.exception("post_to_public_feed fatal: %s", e)
+
