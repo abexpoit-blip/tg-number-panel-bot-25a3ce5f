@@ -24,6 +24,7 @@ const toNumber = (n: any) => ({
   service_id: n.service_id,
   country_id: n.country_id,
   provider_id: n.provider_id || null,
+  range_id: n.range_id || null,
   enabled: n.status ? n.status !== "disabled" : n.enabled ?? true,
 });
 
@@ -142,6 +143,7 @@ export const api = {
         service_id: b.service_id,
         country_id: b.country_id,
         provider_id: b.provider_id || null,
+        range_id: b.range_id || null,
         phones: Array.isArray(b.msisdns) ? b.msisdns.join("\n") : b.phones ?? b.msisdns ?? "",
       }),
     }),
