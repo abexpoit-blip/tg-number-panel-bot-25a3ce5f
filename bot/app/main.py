@@ -381,15 +381,17 @@ async def on_range_chosen(cb: CallbackQuery):
     svc_id, ctry_id, rng_id = int(svc_id_s), int(ctry_id_s), int(rng_id_s)
     u = await ensure_user(cb.from_user)
     async with SessionLocal() as s:
-        avail = (await s.execute(
-            select(Number).where(
-                Number.service_id == svc_id,
-                Number.country_id == ctry_id,
-                Number.range_id == rng_id,
-                Number.enabled == True,
-                Number.assigned_user_id.is_(None),
-            ).limit(5)
-        )).scalars().all()
+        stmt = select(Number).where(
+            Number.service_id == svc_id,
+            Number.country_id == ctry_id,
+            Number.enabled == True,
+            Number.assigned_user_id.is_(None),
+        )
+        if rng_id == 0:
+            stmt = stmt.where(Number.range_id.is_(None))
+        else:
+            stmt = stmt.where(Number.range_id == rng_id)
+        avail = (await s.execute(stmt.limit(5))).scalars().all()
         if not avail:
             await cb.message.edit_text("😕 No more numbers in this range. Pick another.")
             await cb.answer()
@@ -400,7 +402,7 @@ async def on_range_chosen(cb: CallbackQuery):
         await s.commit()
         sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one()
         ctry = (await s.execute(select(Country).where(Country.id == ctry_id))).scalar_one()
-    await render_user_numbers(cb.message, u.id, svc_id, ctry_id, sv, ctry, edit=True, range_id=rng_id)
+    await render_user_numbers(cb.message, u.id, svc_id, ctry_id, sv, ctry, edit=True, range_id=(rng_id if rng_id != 0 else None))
     await cb.answer()
 
 
