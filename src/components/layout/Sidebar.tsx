@@ -6,6 +6,7 @@ const LINKS = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/otp", label: "Live OTP", icon: Radio },
   { to: "/feed", label: "Feed Channels", icon: Megaphone },
+  { to: "/notices", label: "Notices", icon: Bell },
   { to: "/numbers", label: "Numbers", icon: Phone },
   { to: "/services", label: "Services", icon: Layers },
   { to: "/providers", label: "Providers", icon: Plug },
