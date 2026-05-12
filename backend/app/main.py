@@ -134,6 +134,7 @@ app.include_router(withdrawals.router, prefix="/withdrawals", tags=["withdrawals
 app.include_router(sms.router, prefix="/sms", tags=["sms"])
 app.include_router(settings_routes.router, prefix="/settings", tags=["settings"])
 app.include_router(ims.router, prefix="/ims", tags=["ims"])
+app.include_router(ranges_routes.router, prefix="/ranges", tags=["ranges"])
 app.include_router(providers_routes.router, prefix="/providers", tags=["providers"])
 
 
