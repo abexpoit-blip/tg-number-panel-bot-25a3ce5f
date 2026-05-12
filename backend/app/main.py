@@ -44,6 +44,16 @@ async def _ensure_columns(conn):
         # do not resend the same provider/feed OTP row again.
         "CREATE TABLE IF NOT EXISTS otp_delivery_events (event_key VARCHAR(128) PRIMARY KEY, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
         "ALTER TABLE otps ADD COLUMN IF NOT EXISTS raw_text TEXT DEFAULT ''",
+        # Admin broadcast notices log.
+        "CREATE TABLE IF NOT EXISTS notices ("
+        " id SERIAL PRIMARY KEY,"
+        " text TEXT NOT NULL,"
+        " target VARCHAR(16) NOT NULL DEFAULT 'both',"
+        " sent_count INTEGER NOT NULL DEFAULT 0,"
+        " failed_count INTEGER NOT NULL DEFAULT 0,"
+        " total_targets INTEGER NOT NULL DEFAULT 0,"
+        " status VARCHAR(16) NOT NULL DEFAULT 'done',"
+        " created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     ]
     from sqlalchemy import text
     for s in stmts:
