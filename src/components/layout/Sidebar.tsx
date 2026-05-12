@@ -1,10 +1,11 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Zap, LayoutDashboard, Radio, Phone, Layers, Globe, Users, Wallet, Settings as SettingsIcon, LogOut, Plug, Sparkles, Hash } from "lucide-react";
+import { Zap, LayoutDashboard, Radio, Phone, Layers, Globe, Users, Wallet, Settings as SettingsIcon, LogOut, Plug, Sparkles, Hash, Megaphone } from "lucide-react";
 import { setToken } from "@/lib/api";
 
 const LINKS = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/otp", label: "Live OTP", icon: Radio },
+  { to: "/feed", label: "Feed Channels", icon: Megaphone },
   { to: "/numbers", label: "Numbers", icon: Phone },
   { to: "/services", label: "Services", icon: Layers },
   { to: "/providers", label: "Providers", icon: Plug },
