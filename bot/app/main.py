@@ -19,7 +19,7 @@ from aiogram.types import (
 from sqlalchemy import select
 
 from .config import settings
-from .db import Base, Country, Number, Otp, Service, SessionLocal, TgUser, engine
+from .db import Base, Country, CountryRange, Number, Otp, Service, SessionLocal, TgUser, engine
 from .emoji import flag_emoji_html, service_emoji_html
 from .parser import parse_message
 from .ims_worker import ims_main
@@ -291,7 +291,42 @@ async def on_country_chosen(cb: CallbackQuery):
     svc_id, ctry_id = int(svc_id_s), int(ctry_id_s)
     u = await ensure_user(cb.from_user)
     async with SessionLocal() as s:
-        # assign up to 5 available numbers to this user
+        # If this country has any enabled ranges with available numbers, show range sub-menu
+        rng_rows = (await s.execute(
+            select(CountryRange, Number)
+            .join(Number, Number.range_id == CountryRange.id)
+            .where(
+                CountryRange.country_id == ctry_id,
+                CountryRange.enabled == True,
+                Number.service_id == svc_id,
+                Number.enabled == True,
+                Number.assigned_user_id.is_(None),
+            )
+        )).all()
+        if rng_rows:
+            counts: dict[int, tuple[CountryRange, int]] = {}
+            for r, _n in rng_rows:
+                cur = counts.get(r.id, (r, 0))
+                counts[r.id] = (r, cur[1] + 1)
+            sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one()
+            ctry = (await s.execute(select(Country).where(Country.id == ctry_id))).scalar_one()
+            buttons = []
+            lines = []
+            for _rid, (r, cnt) in sorted(counts.items(), key=lambda kv: (kv[1][0].sort_order, kv[1][0].id)):
+                buttons.append([InlineKeyboardButton(
+                    text=f"{ctry.flag} {r.name} - {cnt}",
+                    callback_data=f"rng:{svc_id}:{ctry_id}:{r.id}",
+                )])
+                lines.append(f"{flag_html(ctry)} <b>{r.name}</b> - {cnt}")
+            buttons.append([InlineKeyboardButton(text="⬅️ Back To Countries", callback_data=f"svc:{svc_id}")])
+            await cb.message.edit_text(
+                f"{emoji_html(sv)} <b>Pick a {ctry.name} range:</b>\n\n" + "\n".join(lines),
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+            )
+            await cb.answer()
+            return
+
+        # Fallback: no ranges configured — assign directly as before
         avail = (await s.execute(
             select(Number).where(
                 Number.service_id == svc_id,
@@ -310,7 +345,36 @@ async def on_country_chosen(cb: CallbackQuery):
         await s.commit()
         sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one()
         ctry = (await s.execute(select(Country).where(Country.id == ctry_id))).scalar_one()
-    await render_user_numbers(cb.message, u.id, svc_id, ctry_id, sv, ctry, edit=True)
+    await render_user_numbers(cb.message, u.id, svc_id, ctry_id, sv, ctry, edit=True, range_id=None)
+    await cb.answer()
+
+
+@dp.callback_query(F.data.startswith("rng:"))
+async def on_range_chosen(cb: CallbackQuery):
+    _, svc_id_s, ctry_id_s, rng_id_s = cb.data.split(":")
+    svc_id, ctry_id, rng_id = int(svc_id_s), int(ctry_id_s), int(rng_id_s)
+    u = await ensure_user(cb.from_user)
+    async with SessionLocal() as s:
+        avail = (await s.execute(
+            select(Number).where(
+                Number.service_id == svc_id,
+                Number.country_id == ctry_id,
+                Number.range_id == rng_id,
+                Number.enabled == True,
+                Number.assigned_user_id.is_(None),
+            ).limit(5)
+        )).scalars().all()
+        if not avail:
+            await cb.message.edit_text("😕 No more numbers in this range. Pick another.")
+            await cb.answer()
+            return
+        for n in avail:
+            n.assigned_user_id = u.id
+            n.assigned_at = datetime.utcnow()
+        await s.commit()
+        sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one()
+        ctry = (await s.execute(select(Country).where(Country.id == ctry_id))).scalar_one()
+    await render_user_numbers(cb.message, u.id, svc_id, ctry_id, sv, ctry, edit=True, range_id=rng_id)
     await cb.answer()
 
 
