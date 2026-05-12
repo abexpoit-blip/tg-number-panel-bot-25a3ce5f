@@ -1,7 +1,7 @@
 """Shared SQLAlchemy session for the bot. Models mirror the backend schema."""
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -106,8 +106,6 @@ class Number(Base):
 
     service: Mapped[Service] = relationship(lazy="joined")
     country: Mapped[Country] = relationship(lazy="joined")
-
-    __table_args__ = (UniqueConstraint("phone", "service_id", name="uq_phone_service"),)
 
 
 class Otp(Base):
