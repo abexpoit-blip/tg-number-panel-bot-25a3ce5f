@@ -247,15 +247,9 @@ async def on_get_number(msg: Message):
 async def on_service_chosen(cb: CallbackQuery):
     svc_id = int(cb.data.split(":")[1])
     async with SessionLocal() as s:
-        # Per-(country, range) accurate available counts in a single GROUP BY.
-        # "available" = enabled & unassigned. Disabled ranges are excluded entirely
-        # so their numbers do not leak into the un-ranged bucket either.
+        # Aggregate available numbers per country (sum across all enabled ranges + un-ranged).
         rows = (await s.execute(
-            select(
-                Country,
-                CountryRange,
-                func.count(Number.id).label("cnt"),
-            )
+            select(Country, func.count(Number.id).label("cnt"))
             .select_from(Number)
             .join(Country, Country.id == Number.country_id)
             .outerjoin(
@@ -266,43 +260,23 @@ async def on_service_chosen(cb: CallbackQuery):
                 Number.service_id == svc_id,
                 Number.enabled == True,  # noqa: E712
                 Number.assigned_user_id.is_(None),
-                # drop numbers whose range is disabled (range_id set but join missed)
                 (Number.range_id.is_(None)) | (CountryRange.id.is_not(None)),
             )
-            .group_by(Country.id, CountryRange.id)
+            .group_by(Country.id)
         )).all()
-        if not rows:
-            await cb.message.edit_text("😕 No numbers available for this service. Try again later.")
-            await cb.answer()
-            return
-        # rows already deduped by GROUP BY; no manual aggregation needed.
-        groups: dict[tuple[int, int], tuple[Country, "CountryRange|None", int]] = {
-            (c.id, r.id if r else 0): (c, r, int(cnt or 0))
-            for c, r, cnt in rows if int(cnt or 0) > 0
-        }
-        if not groups:
+        countries = [(c, int(cnt or 0)) for c, cnt in rows if int(cnt or 0) > 0]
+        if not countries:
             await cb.message.edit_text("😕 No numbers available for this service. Try again later.")
             await cb.answer()
             return
         sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one()
-    # Sort: by country, then range sort_order/id; un-ranged first within a country
-    def sort_key(item):
-        (cid, rid), (c, r, cnt) = item
-        return (-cnt, c.name.lower(), 0 if r is None else 1, (r.sort_order if r else 0), rid)
-    ordered = sorted(groups.items(), key=sort_key)
+    countries.sort(key=lambda x: (-x[1], x[0].name.lower()))
     buttons = []
     lines = []
-    for (cid, rid), (c, r, cnt) in ordered:
-        if r is None:
-            label = f"{c.flag} {c.name} (+{c.code}) - {cnt}"
-            cb_data = f"ctry:{svc_id}:{cid}"
-            line = f"{flag_html(c)} <b>{c.name}</b> (+{c.code}) - {cnt}"
-        else:
-            label = f"{c.flag} {c.name} {r.name} (+{c.code}) - {cnt}"
-            cb_data = f"rng:{svc_id}:{cid}:{rid}"
-            line = f"{flag_html(c)} <b>{c.name} {r.name}</b> (+{c.code}) - {cnt}"
-        buttons.append([InlineKeyboardButton(text=label, callback_data=cb_data)])
-        lines.append(line)
+    for c, cnt in countries:
+        label = f"{c.flag} {c.name} (+{c.code}) - {cnt}"
+        buttons.append([InlineKeyboardButton(text=label, callback_data=f"ctry:{svc_id}:{c.id}")])
+        lines.append(f"{flag_html(c)} <b>{c.name}</b> (+{c.code}) - {cnt}")
     buttons.append([InlineKeyboardButton(text="⬅️ Back To Services", callback_data="back:svc")])
     await cb.message.edit_text(
         f"{emoji_html(sv)} <b>Select country for {sv.name}:</b>\n\n" + "\n".join(lines),
@@ -326,16 +300,69 @@ async def on_country_chosen(cb: CallbackQuery):
     svc_id, ctry_id = int(svc_id_s), int(ctry_id_s)
     u = await ensure_user(cb.from_user)
     async with SessionLocal() as s:
-        # Assign un-ranged numbers (ranges are now picked directly from the country list)
-        avail = (await s.execute(
-            select(Number).where(
+        # Per-range available counts for this country+service.
+        rows = (await s.execute(
+            select(CountryRange, func.count(Number.id).label("cnt"))
+            .select_from(Number)
+            .outerjoin(
+                CountryRange,
+                (CountryRange.id == Number.range_id) & (CountryRange.enabled == True),  # noqa: E712
+            )
+            .where(
                 Number.service_id == svc_id,
                 Number.country_id == ctry_id,
-                Number.range_id.is_(None),
-                Number.enabled == True,
+                Number.enabled == True,  # noqa: E712
                 Number.assigned_user_id.is_(None),
-            ).limit(5)
-        )).scalars().all()
+                (Number.range_id.is_(None)) | (CountryRange.id.is_not(None)),
+            )
+            .group_by(CountryRange.id)
+        )).all()
+        groups = [(r, int(cnt or 0)) for r, cnt in rows if int(cnt or 0) > 0]
+        sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one()
+        ctry = (await s.execute(select(Country).where(Country.id == ctry_id))).scalar_one()
+
+        # Decide: if there are multiple buckets (ranges and/or un-ranged),
+        # show a range picker. Otherwise auto-assign from the only bucket.
+        if len(groups) > 1:
+            groups.sort(key=lambda x: (-x[1], 0 if x[0] is None else 1, (x[0].sort_order if x[0] else 0), (x[0].id if x[0] else 0)))
+            buttons = []
+            lines = []
+            for r, cnt in groups:
+                if r is None:
+                    label = f"{ctry.flag} {ctry.name} (+{ctry.code}) - {cnt}"
+                    cb_data = f"rng:{svc_id}:{ctry_id}:0"
+                    line = f"{flag_html(ctry)} <b>{ctry.name}</b> (+{ctry.code}) - {cnt}"
+                else:
+                    label = f"{ctry.flag} {ctry.name} {r.name} (+{ctry.code}) - {cnt}"
+                    cb_data = f"rng:{svc_id}:{ctry_id}:{r.id}"
+                    line = f"{flag_html(ctry)} <b>{ctry.name} {r.name}</b> (+{ctry.code}) - {cnt}"
+                buttons.append([InlineKeyboardButton(text=label, callback_data=cb_data)])
+                lines.append(line)
+            buttons.append([InlineKeyboardButton(text="⬅️ Back", callback_data=f"svc:{svc_id}")])
+            await cb.message.edit_text(
+                f"{flag_html(ctry)} <b>Select range for {ctry.name}:</b>\n\n" + "\n".join(lines),
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+            )
+            await cb.answer()
+            return
+
+        if not groups:
+            await cb.message.edit_text("😕 No more numbers in this country. Tap 🌍 Change Country.")
+            await cb.answer()
+            return
+
+        only_range = groups[0][0]
+        stmt = select(Number).where(
+            Number.service_id == svc_id,
+            Number.country_id == ctry_id,
+            Number.enabled == True,
+            Number.assigned_user_id.is_(None),
+        )
+        if only_range is None:
+            stmt = stmt.where(Number.range_id.is_(None))
+        else:
+            stmt = stmt.where(Number.range_id == only_range.id)
+        avail = (await s.execute(stmt.limit(5))).scalars().all()
         if not avail:
             await cb.message.edit_text("😕 No more numbers in this country. Tap 🌍 Change Country.")
             await cb.answer()
@@ -344,9 +371,7 @@ async def on_country_chosen(cb: CallbackQuery):
             n.assigned_user_id = u.id
             n.assigned_at = datetime.utcnow()
         await s.commit()
-        sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one()
-        ctry = (await s.execute(select(Country).where(Country.id == ctry_id))).scalar_one()
-    await render_user_numbers(cb.message, u.id, svc_id, ctry_id, sv, ctry, edit=True, range_id=None)
+    await render_user_numbers(cb.message, u.id, svc_id, ctry_id, sv, ctry, edit=True, range_id=(only_range.id if only_range else None))
     await cb.answer()
 
 
