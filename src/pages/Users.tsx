@@ -49,8 +49,8 @@ export default function Users() {
                   </div>
                 </td>
                 <td className="text-muted-foreground">{u.username ? "@" + u.username : "—"}</td>
-                <td><span className="font-mono text-success">${Number(u.balance).toFixed(4)}</span></td>
-                <td><span className="font-mono">${Number(u.total_earned).toFixed(4)}</span></td>
+                <td><span className="font-mono text-success">৳{Number(u.balance).toFixed(2)} <span className="text-xs text-muted-foreground">BDT</span></span></td>
+                <td><span className="font-mono">৳{Number(u.total_earned || 0).toFixed(2)}</span></td>
                 <td>{u.otp_count}</td>
                 <td className="text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td>
                 <td className="text-right">

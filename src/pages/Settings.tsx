@@ -10,8 +10,8 @@ import { toast } from "sonner";
 
 const LABELS: Record<string, string> = {
   reward_enabled: "Pay rewards per OTP",
-  reward_per_otp: "Reward amount per OTP ($)",
-  min_withdraw: "Minimum withdrawal ($)",
+  reward_per_otp: "Reward amount per OTP (BDT)",
+  min_withdraw: "Minimum withdrawal (BDT)",
   ref_bonus_pct: "Referral bonus %",
   bot_panel_url: "Bot panel URL (Bot Pnl button)",
   support_url: "Support URL (All Support button)",
@@ -43,6 +43,8 @@ const LABELS: Record<string, string> = {
 
 // Always-visible keys (so admin can configure even if empty in DB)
 const ALWAYS_KEYS = [
+  "reward_enabled",
+  "reward_per_otp",
   "main_channel_url",
   "number_channel_url",
   "main_channel_emoji_id",
