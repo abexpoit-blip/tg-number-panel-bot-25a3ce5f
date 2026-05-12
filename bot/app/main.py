@@ -7,6 +7,7 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command, CommandStart
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import (
     BufferedInputFile,
     CallbackQuery,
@@ -344,6 +345,47 @@ async def on_service_chosen(cb: CallbackQuery):
     await cb.answer()
 
 
+@dp.callback_query(F.data.startswith("cc:"))
+async def on_change_country(cb: CallbackQuery):
+    """Change Country: open a NEW window (do not overwrite the current numbers window)."""
+    svc_id = int(cb.data.split(":")[1])
+    async with SessionLocal() as s:
+        rows = (await s.execute(
+            select(Country, func.count(Number.id).label("cnt"))
+            .select_from(Number)
+            .join(Country, Country.id == Number.country_id)
+            .outerjoin(
+                CountryRange,
+                (CountryRange.id == Number.range_id) & (CountryRange.enabled == True),  # noqa: E712
+            )
+            .where(
+                Number.service_id == svc_id,
+                Number.enabled == True,  # noqa: E712
+                Number.assigned_user_id.is_(None),
+                (Number.range_id.is_(None)) | (CountryRange.id.is_not(None)),
+            )
+            .group_by(Country.id)
+        )).all()
+        countries = [(c, int(cnt or 0)) for c, cnt in rows if int(cnt or 0) > 0]
+        if not countries:
+            await cb.answer("😕 No numbers available for this service.", show_alert=True)
+            return
+        sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one()
+    countries.sort(key=lambda x: (-x[1], x[0].name.lower()))
+    buttons = []
+    lines = []
+    for c, cnt in countries:
+        label = f"{c.flag} {c.name} (+{c.code}) - {cnt}"
+        buttons.append([InlineKeyboardButton(text=label, callback_data=f"ctry:{svc_id}:{c.id}")])
+        lines.append(f"{flag_html(c)} <b>{c.name}</b> (+{c.code}) - {cnt}")
+    buttons.append([InlineKeyboardButton(text="⬅️ Back To Services", callback_data="back:svc")])
+    await cb.message.answer(
+        f"{emoji_html(sv)} <b>Select country for {sv.name}:</b>\n\n" + "\n".join(lines),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+    )
+    await cb.answer()
+
+
 @dp.callback_query(F.data == "back:svc")
 async def back_to_services(cb: CallbackQuery):
     async with SessionLocal() as s:
@@ -497,7 +539,7 @@ async def render_user_numbers(target: Message, user_pk: int, svc_id: int, ctry_i
         rows.append([copy_button(label, copy)])
     rng_suffix = f":{range_id}" if range_id is not None else ":0"
     rows.append([InlineKeyboardButton(text="🔄 Change Number", callback_data=f"chg:{svc_id}:{ctry_id}{rng_suffix}")])
-    rows.append([InlineKeyboardButton(text="🌍 Change Country", callback_data=f"svc:{svc_id}")])
+    rows.append([InlineKeyboardButton(text="🌍 Change Country", callback_data=f"cc:{svc_id}")])
     rows.append([InlineKeyboardButton(text="📋 View OTPs", callback_data=f"vw:{svc_id}:{ctry_id}{rng_suffix}:0")])
     rows.append([InlineKeyboardButton(text="📥 Download all OTP", callback_data=f"dl:{svc_id}:{ctry_id}{rng_suffix}")])
 
@@ -505,6 +547,10 @@ async def render_user_numbers(target: Message, user_pk: int, svc_id: int, ctry_i
     if edit:
         try:
             await target.edit_text(header, reply_markup=kb)
+        except TelegramBadRequest as e:
+            # "message is not modified" → ignore; do not re-post a duplicate window.
+            if "not modified" not in str(e).lower():
+                await target.answer(header, reply_markup=kb)
         except Exception:
             await target.answer(header, reply_markup=kb)
     else:
