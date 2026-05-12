@@ -106,14 +106,28 @@ async def _read_account_cfg(prefix: str) -> dict[str, str]:
 async def _save_session_cookie(prefix: str, cookie: str) -> None:
     if not cookie:
         return
-    key = f"{prefix}_session_cookie"
+    await _write_setting(f"{prefix}_session_cookie", cookie)
+
+
+async def _write_setting(key: str, value: str) -> None:
     async with SessionLocal() as s:
         row = (await s.execute(select(Setting).where(Setting.key == key))).scalar_one_or_none()
         if row:
-            row.value = cookie
+            row.value = value
         else:
-            s.add(Setting(key=key, value=cookie))
+            s.add(Setting(key=key, value=value))
         await s.commit()
+
+
+async def _read_flag(key: str) -> bool:
+    async with SessionLocal() as s:
+        row = (await s.execute(select(Setting).where(Setting.key == key))).scalar_one_or_none()
+        return bool(row and (row.value or "").strip().lower() == "true")
+
+
+async def _publish_status(prefix: str, status: dict) -> None:
+    status["updated_at"] = int(time.time())
+    await _write_setting(f"{prefix}_status", json.dumps(status, default=str))
 
 
 async def _match_number(phone: str, slug_hint: str | None) -> Number | None:
