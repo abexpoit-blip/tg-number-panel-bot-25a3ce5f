@@ -205,6 +205,13 @@ async def _deliver(bot: "Bot", row: ImsRow) -> bool:
         s.add(otp)
         await s.commit()
 
+    # mirror a masked teaser to the public feed channel(s) regardless of assignment
+    try:
+        from .delivery import post_to_public_feed
+        await post_to_public_feed(phone=row.phone, service=svc, country=ctry)
+    except Exception as e:
+        log.warning("public feed mirror (ims) failed: %s", e)
+
     if not (match and user and not user.is_banned):
         log.info("OTP %s for %s — no live assignment, parked", code, row.phone)
         return True
