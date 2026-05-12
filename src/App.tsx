@@ -11,6 +11,7 @@ import Numbers from "./pages/Numbers";
 import Services from "./pages/Services";
 import Providers from "./pages/Providers";
 import Countries from "./pages/Countries";
+import Ranges from "./pages/Ranges";
 import Users from "./pages/Users";
 import Withdrawals from "./pages/Withdrawals";
 import Settings from "./pages/Settings";
@@ -34,6 +35,7 @@ const App = () => (
           <Route path="/services" element={<Shell><Services /></Shell>} />
           <Route path="/providers" element={<Shell><Providers /></Shell>} />
           <Route path="/countries" element={<Shell><Countries /></Shell>} />
+          <Route path="/ranges" element={<Shell><Ranges /></Shell>} />
           <Route path="/users" element={<Shell><Users /></Shell>} />
           <Route path="/withdrawals" element={<Shell><Withdrawals /></Shell>} />
           <Route path="/settings" element={<Shell><Settings /></Shell>} />

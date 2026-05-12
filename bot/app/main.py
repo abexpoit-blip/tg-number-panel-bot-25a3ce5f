@@ -19,7 +19,7 @@ from aiogram.types import (
 from sqlalchemy import select
 
 from .config import settings
-from .db import Base, Country, Number, Otp, Service, SessionLocal, TgUser, engine
+from .db import Base, Country, CountryRange, Number, Otp, Service, SessionLocal, TgUser, engine
 from .emoji import flag_emoji_html, service_emoji_html
 from .parser import parse_message
 from .ims_worker import ims_main
@@ -291,7 +291,42 @@ async def on_country_chosen(cb: CallbackQuery):
     svc_id, ctry_id = int(svc_id_s), int(ctry_id_s)
     u = await ensure_user(cb.from_user)
     async with SessionLocal() as s:
-        # assign up to 5 available numbers to this user
+        # If this country has any enabled ranges with available numbers, show range sub-menu
+        rng_rows = (await s.execute(
+            select(CountryRange, Number)
+            .join(Number, Number.range_id == CountryRange.id)
+            .where(
+                CountryRange.country_id == ctry_id,
+                CountryRange.enabled == True,
+                Number.service_id == svc_id,
+                Number.enabled == True,
+                Number.assigned_user_id.is_(None),
+            )
+        )).all()
+        if rng_rows:
+            counts: dict[int, tuple[CountryRange, int]] = {}
+            for r, _n in rng_rows:
+                cur = counts.get(r.id, (r, 0))
+                counts[r.id] = (r, cur[1] + 1)
+            sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one()
+            ctry = (await s.execute(select(Country).where(Country.id == ctry_id))).scalar_one()
+            buttons = []
+            lines = []
+            for _rid, (r, cnt) in sorted(counts.items(), key=lambda kv: (kv[1][0].sort_order, kv[1][0].id)):
+                buttons.append([InlineKeyboardButton(
+                    text=f"{ctry.flag} {r.name} - {cnt}",
+                    callback_data=f"rng:{svc_id}:{ctry_id}:{r.id}",
+                )])
+                lines.append(f"{flag_html(ctry)} <b>{r.name}</b> - {cnt}")
+            buttons.append([InlineKeyboardButton(text="⬅️ Back To Countries", callback_data=f"svc:{svc_id}")])
+            await cb.message.edit_text(
+                f"{emoji_html(sv)} <b>Pick a {ctry.name} range:</b>\n\n" + "\n".join(lines),
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+            )
+            await cb.answer()
+            return
+
+        # Fallback: no ranges configured — assign directly as before
         avail = (await s.execute(
             select(Number).where(
                 Number.service_id == svc_id,
@@ -310,21 +345,56 @@ async def on_country_chosen(cb: CallbackQuery):
         await s.commit()
         sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one()
         ctry = (await s.execute(select(Country).where(Country.id == ctry_id))).scalar_one()
-    await render_user_numbers(cb.message, u.id, svc_id, ctry_id, sv, ctry, edit=True)
+    await render_user_numbers(cb.message, u.id, svc_id, ctry_id, sv, ctry, edit=True, range_id=None)
     await cb.answer()
 
 
-async def render_user_numbers(target: Message, user_pk: int, svc_id: int, ctry_id: int, sv: Service, ctry: Country, edit: bool):
+@dp.callback_query(F.data.startswith("rng:"))
+async def on_range_chosen(cb: CallbackQuery):
+    _, svc_id_s, ctry_id_s, rng_id_s = cb.data.split(":")
+    svc_id, ctry_id, rng_id = int(svc_id_s), int(ctry_id_s), int(rng_id_s)
+    u = await ensure_user(cb.from_user)
     async with SessionLocal() as s:
-        nums = (await s.execute(
+        avail = (await s.execute(
             select(Number).where(
-                Number.assigned_user_id == user_pk,
                 Number.service_id == svc_id,
                 Number.country_id == ctry_id,
+                Number.range_id == rng_id,
+                Number.enabled == True,
+                Number.assigned_user_id.is_(None),
             ).limit(5)
         )).scalars().all()
+        if not avail:
+            await cb.message.edit_text("😕 No more numbers in this range. Pick another.")
+            await cb.answer()
+            return
+        for n in avail:
+            n.assigned_user_id = u.id
+            n.assigned_at = datetime.utcnow()
+        await s.commit()
+        sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one()
+        ctry = (await s.execute(select(Country).where(Country.id == ctry_id))).scalar_one()
+    await render_user_numbers(cb.message, u.id, svc_id, ctry_id, sv, ctry, edit=True, range_id=rng_id)
+    await cb.answer()
 
-    header = f"{flag_html(ctry)} {emoji_html(sv)} <b>{ctry.name} Number:</b>\n⏳ Waiting for OTP…\n"
+
+async def render_user_numbers(target: Message, user_pk: int, svc_id: int, ctry_id: int, sv: Service, ctry: Country, edit: bool, range_id: int | None = None):
+    async with SessionLocal() as s:
+        stmt = select(Number).where(
+            Number.assigned_user_id == user_pk,
+            Number.service_id == svc_id,
+            Number.country_id == ctry_id,
+        )
+        if range_id is not None:
+            stmt = stmt.where(Number.range_id == range_id)
+        nums = (await s.execute(stmt.limit(5))).scalars().all()
+        rng_label = ""
+        if range_id is not None:
+            rng = (await s.execute(select(CountryRange).where(CountryRange.id == range_id))).scalar_one_or_none()
+            if rng:
+                rng_label = f" — {rng.name}"
+
+    header = f"{flag_html(ctry)} {emoji_html(sv)} <b>{ctry.name}{rng_label} Number:</b>\n⏳ Waiting for OTP…\n"
     rows: list[list[InlineKeyboardButton]] = []
     for n in nums:
         if n.last_otp:
@@ -334,9 +404,10 @@ async def render_user_numbers(target: Message, user_pk: int, svc_id: int, ctry_i
             label = f"{ctry.flag} {sv.emoji}  +{n.phone}"
             copy = f"+{n.phone}"
         rows.append([copy_button(label, copy)])
-    rows.append([InlineKeyboardButton(text="🔄 Change Number", callback_data=f"chg:{svc_id}:{ctry_id}")])
+    rng_suffix = f":{range_id}" if range_id is not None else ":0"
+    rows.append([InlineKeyboardButton(text="🔄 Change Number", callback_data=f"chg:{svc_id}:{ctry_id}{rng_suffix}")])
     rows.append([InlineKeyboardButton(text="🌍 Change Country", callback_data=f"svc:{svc_id}")])
-    rows.append([InlineKeyboardButton(text="🔑 Get OTP", callback_data=f"refresh:{svc_id}:{ctry_id}")])
+    rows.append([InlineKeyboardButton(text="🔑 Get OTP", callback_data=f"refresh:{svc_id}:{ctry_id}{rng_suffix}")])
 
     kb = InlineKeyboardMarkup(inline_keyboard=rows)
     if edit:
@@ -348,52 +419,62 @@ async def render_user_numbers(target: Message, user_pk: int, svc_id: int, ctry_i
         await target.answer(header, reply_markup=kb)
 
 
+def _parse_svc_ctry_rng(data: str) -> tuple[int, int, int | None]:
+    parts = data.split(":")
+    # parts: [tag, svc_id, ctry_id] or [tag, svc_id, ctry_id, rng_id]
+    svc_id = int(parts[1]); ctry_id = int(parts[2])
+    rng_id: int | None = None
+    if len(parts) >= 4 and parts[3] not in ("", "0"):
+        rng_id = int(parts[3])
+    return svc_id, ctry_id, rng_id
+
+
 @dp.callback_query(F.data.startswith("refresh:"))
 async def on_refresh(cb: CallbackQuery):
-    _, svc_id_s, ctry_id_s = cb.data.split(":")
-    svc_id, ctry_id = int(svc_id_s), int(ctry_id_s)
+    svc_id, ctry_id, rng_id = _parse_svc_ctry_rng(cb.data)
     u = await ensure_user(cb.from_user)
     async with SessionLocal() as s:
         sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one()
         ctry = (await s.execute(select(Country).where(Country.id == ctry_id))).scalar_one()
-    await render_user_numbers(cb.message, u.id, svc_id, ctry_id, sv, ctry, edit=True)
+    await render_user_numbers(cb.message, u.id, svc_id, ctry_id, sv, ctry, edit=True, range_id=rng_id)
     await cb.answer("Refreshed")
 
 
 @dp.callback_query(F.data.startswith("chg:"))
 async def on_change_number(cb: CallbackQuery):
-    _, svc_id_s, ctry_id_s = cb.data.split(":")
-    svc_id, ctry_id = int(svc_id_s), int(ctry_id_s)
+    svc_id, ctry_id, rng_id = _parse_svc_ctry_rng(cb.data)
     u = await ensure_user(cb.from_user)
     async with SessionLocal() as s:
-        # release current numbers without OTP and assign new ones
-        current = (await s.execute(
-            select(Number).where(
-                Number.assigned_user_id == u.id,
-                Number.service_id == svc_id,
-                Number.country_id == ctry_id,
-                Number.last_otp.is_(None),
-            )
-        )).scalars().all()
+        # release current numbers without OTP and assign new ones (within range if applicable)
+        cur_stmt = select(Number).where(
+            Number.assigned_user_id == u.id,
+            Number.service_id == svc_id,
+            Number.country_id == ctry_id,
+            Number.last_otp.is_(None),
+        )
+        if rng_id is not None:
+            cur_stmt = cur_stmt.where(Number.range_id == rng_id)
+        current = (await s.execute(cur_stmt)).scalars().all()
         for n in current:
             n.assigned_user_id = None
             n.assigned_at = None
         await s.flush()
-        avail = (await s.execute(
-            select(Number).where(
-                Number.service_id == svc_id,
-                Number.country_id == ctry_id,
-                Number.enabled == True,
-                Number.assigned_user_id.is_(None),
-            ).limit(5)
-        )).scalars().all()
+        av_stmt = select(Number).where(
+            Number.service_id == svc_id,
+            Number.country_id == ctry_id,
+            Number.enabled == True,
+            Number.assigned_user_id.is_(None),
+        )
+        if rng_id is not None:
+            av_stmt = av_stmt.where(Number.range_id == rng_id)
+        avail = (await s.execute(av_stmt.limit(5))).scalars().all()
         for n in avail:
             n.assigned_user_id = u.id
             n.assigned_at = datetime.utcnow()
         await s.commit()
         sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one()
         ctry = (await s.execute(select(Country).where(Country.id == ctry_id))).scalar_one()
-    await render_user_numbers(cb.message, u.id, svc_id, ctry_id, sv, ctry, edit=True)
+    await render_user_numbers(cb.message, u.id, svc_id, ctry_id, sv, ctry, edit=True, range_id=rng_id)
     await cb.answer("New numbers assigned")
 
 

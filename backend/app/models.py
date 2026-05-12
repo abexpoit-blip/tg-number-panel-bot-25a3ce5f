@@ -36,6 +36,24 @@ class Country(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class CountryRange(Base):
+    """Sub-range of a country (e.g. 'Peru 1' covering numbers starting with 5198).
+
+    Bot shows ranges as a sub-step after the user picks the country, so a single
+    country can expose multiple labelled buckets.
+    """
+    __tablename__ = "country_ranges"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    country_id: Mapped[int] = mapped_column(ForeignKey("countries.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80))               # e.g. "Peru 1"
+    prefix: Mapped[str] = mapped_column(String(32), default="")  # informational, e.g. "5198"
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    country: Mapped[Country] = relationship(lazy="joined")
+
+
 class TgUser(Base):
     __tablename__ = "tg_users"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -73,6 +91,7 @@ class Number(Base):
     service_id: Mapped[int] = mapped_column(ForeignKey("services.id", ondelete="CASCADE"), index=True)
     country_id: Mapped[int] = mapped_column(ForeignKey("countries.id", ondelete="CASCADE"), index=True)
     provider_id: Mapped[int | None] = mapped_column(ForeignKey("providers.id", ondelete="SET NULL"), nullable=True, index=True)
+    range_id: Mapped[int | None] = mapped_column(ForeignKey("country_ranges.id", ondelete="SET NULL"), nullable=True, index=True)
     assigned_user_id: Mapped[int | None] = mapped_column(ForeignKey("tg_users.id", ondelete="SET NULL"), nullable=True, index=True)
     assigned_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_otp: Mapped[str | None] = mapped_column(String(32), nullable=True)
@@ -83,6 +102,7 @@ class Number(Base):
     service: Mapped[Service] = relationship(lazy="joined")
     country: Mapped[Country] = relationship(lazy="joined")
     provider: Mapped["Provider | None"] = relationship(lazy="joined")
+    range_: Mapped["CountryRange | None"] = relationship(lazy="joined", foreign_keys=[range_id])
 
     __table_args__ = (UniqueConstraint("phone", "service_id", name="uq_phone_service"),)
 

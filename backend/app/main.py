@@ -10,7 +10,7 @@ from .config import settings
 from .db import Base, SessionLocal, engine
 from .models import Admin, Country, Provider, Service
 from .routes import auth as auth_routes
-from .routes import countries, dashboard, ims, numbers, providers as providers_routes, services, settings as settings_routes, sms, users, withdrawals
+from .routes import countries, dashboard, ims, numbers, providers as providers_routes, ranges as ranges_routes, services, settings as settings_routes, sms, users, withdrawals
 
 
 async def _ensure_columns(conn):
@@ -29,6 +29,9 @@ async def _ensure_columns(conn):
         # Balance now stores fractional BDT (e.g. 0.40 per OTP).
         "ALTER TABLE tg_users ALTER COLUMN balance TYPE DOUBLE PRECISION USING balance::double precision",
         "ALTER TABLE tg_users ALTER COLUMN balance SET DEFAULT 0",
+        # Country ranges: optional sub-step under each country.
+        "ALTER TABLE numbers  ADD COLUMN IF NOT EXISTS range_id INTEGER REFERENCES country_ranges(id) ON DELETE SET NULL",
+        "CREATE INDEX IF NOT EXISTS ix_numbers_range_id ON numbers(range_id)",
     ]
     from sqlalchemy import text
     for s in stmts:
@@ -131,6 +134,7 @@ app.include_router(withdrawals.router, prefix="/withdrawals", tags=["withdrawals
 app.include_router(sms.router, prefix="/sms", tags=["sms"])
 app.include_router(settings_routes.router, prefix="/settings", tags=["settings"])
 app.include_router(ims.router, prefix="/ims", tags=["ims"])
+app.include_router(ranges_routes.router, prefix="/ranges", tags=["ranges"])
 app.include_router(providers_routes.router, prefix="/providers", tags=["providers"])
 
 
