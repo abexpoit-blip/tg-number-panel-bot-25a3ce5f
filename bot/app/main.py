@@ -345,6 +345,47 @@ async def on_service_chosen(cb: CallbackQuery):
     await cb.answer()
 
 
+@dp.callback_query(F.data.startswith("cc:"))
+async def on_change_country(cb: CallbackQuery):
+    """Change Country: open a NEW window (do not overwrite the current numbers window)."""
+    svc_id = int(cb.data.split(":")[1])
+    async with SessionLocal() as s:
+        rows = (await s.execute(
+            select(Country, func.count(Number.id).label("cnt"))
+            .select_from(Number)
+            .join(Country, Country.id == Number.country_id)
+            .outerjoin(
+                CountryRange,
+                (CountryRange.id == Number.range_id) & (CountryRange.enabled == True),  # noqa: E712
+            )
+            .where(
+                Number.service_id == svc_id,
+                Number.enabled == True,  # noqa: E712
+                Number.assigned_user_id.is_(None),
+                (Number.range_id.is_(None)) | (CountryRange.id.is_not(None)),
+            )
+            .group_by(Country.id)
+        )).all()
+        countries = [(c, int(cnt or 0)) for c, cnt in rows if int(cnt or 0) > 0]
+        if not countries:
+            await cb.answer("😕 No numbers available for this service.", show_alert=True)
+            return
+        sv = (await s.execute(select(Service).where(Service.id == svc_id))).scalar_one()
+    countries.sort(key=lambda x: (-x[1], x[0].name.lower()))
+    buttons = []
+    lines = []
+    for c, cnt in countries:
+        label = f"{c.flag} {c.name} (+{c.code}) - {cnt}"
+        buttons.append([InlineKeyboardButton(text=label, callback_data=f"ctry:{svc_id}:{c.id}")])
+        lines.append(f"{flag_html(c)} <b>{c.name}</b> (+{c.code}) - {cnt}")
+    buttons.append([InlineKeyboardButton(text="⬅️ Back To Services", callback_data="back:svc")])
+    await cb.message.answer(
+        f"{emoji_html(sv)} <b>Select country for {sv.name}:</b>\n\n" + "\n".join(lines),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+    )
+    await cb.answer()
+
+
 @dp.callback_query(F.data == "back:svc")
 async def back_to_services(cb: CallbackQuery):
     async with SessionLocal() as s:
