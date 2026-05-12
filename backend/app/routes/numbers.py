@@ -165,7 +165,13 @@ async def bulk(body: BulkIn, _: object = Depends(current_admin), db: AsyncSessio
     for ph in phones:
         if not ph:
             continue
-        exists = (await db.execute(select(Number).where(Number.phone == ph, Number.service_id == body.service_id))).scalar_one_or_none()
+        exists = (await db.execute(
+            select(Number).where(
+                Number.phone == ph,
+                Number.service_id == body.service_id,
+                Number.range_id.is_(body.range_id) if body.range_id is None else Number.range_id == body.range_id,
+            )
+        )).scalar_one_or_none()
         if exists:
             continue
         db.add(Number(phone=ph, service_id=body.service_id, country_id=body.country_id,
