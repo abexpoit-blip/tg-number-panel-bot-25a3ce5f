@@ -156,7 +156,7 @@ async def _match_number(phone: str, slug_hint: str | None) -> Number | None:
         return (exact or candidates)[0]
 
 
-async def _deliver(bot: "Bot", row: ImsRow) -> None:
+async def _deliver(bot: "Bot", row: ImsRow) -> bool:
     code = row.extract_code()
     if not code:
         return
