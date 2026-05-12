@@ -32,6 +32,8 @@ class Service(Base):
     keyword: Mapped[str] = mapped_column(String(80), index=True)
     emoji: Mapped[str] = mapped_column(String(16), default="📱")
     custom_emoji_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # icon_mode column may exist in DB but is intentionally not mapped here
+    # so the bot keeps working even before the backend migration runs.
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
