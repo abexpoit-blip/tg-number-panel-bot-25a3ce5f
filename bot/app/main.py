@@ -22,7 +22,7 @@ from .config import settings
 from .db import Base, Country, Number, Otp, Service, SessionLocal, TgUser, engine
 from .emoji import flag_emoji_html, service_emoji_html
 from .parser import parse_message
-from .providers_worker import providers_main
+from .ims_worker import ims_main
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 log = logging.getLogger("bot")
