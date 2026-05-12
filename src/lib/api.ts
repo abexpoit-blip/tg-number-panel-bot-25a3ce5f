@@ -177,5 +177,19 @@ export const api = {
     accounts: () => req<any[]>("/ims/accounts"),
     test: (slot: "1" | "2") =>
       req<{ ok: boolean; rows_seen: number; session_saved: boolean }>(`/ims/${slot}/test`, { method: "POST" }),
+    toggle: (slot: "1" | "2", enabled: boolean) =>
+      req<{ ok: boolean; enabled: boolean }>(`/ims/${slot}/toggle`, {
+        method: "POST",
+        body: JSON.stringify({ enabled }),
+      }),
+    updateConfig: (slot: "1" | "2", body: Record<string, any>) =>
+      req<{ ok: boolean; updated: string[] }>(`/ims/${slot}/config`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    relogin: (slot: "1" | "2") =>
+      req<{ ok: boolean }>(`/ims/${slot}/relogin`, { method: "POST" }),
+    clearSession: (slot: "1" | "2") =>
+      req<{ ok: boolean }>(`/ims/${slot}/clear-session`, { method: "POST" }),
   },
 };
