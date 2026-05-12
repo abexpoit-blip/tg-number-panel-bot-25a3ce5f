@@ -195,6 +195,19 @@ async def _deliver(bot: "Bot", row: ImsRow) -> bool:
     ok = await send_otp_message(user.tg_id, phone=row.phone, code=code, service=svc, country=ctry)
     if ok:
         log.info("✓ delivered OTP %s → tg=%s phone=%s", code, user.tg_id, row.phone)
+        # Credit the configured BDT reward to the user on successful delivery.
+        try:
+            enabled = (await get_setting("reward_enabled", "true")).strip().lower() in ("1", "true", "yes", "on")
+            amount = float(await get_setting("reward_per_otp", "0.40") or 0)
+            if enabled and amount > 0:
+                async with SessionLocal() as s2:
+                    u = (await s2.execute(select(TgUser).where(TgUser.id == user.id))).scalar_one_or_none()
+                    if u:
+                        u.balance = float(u.balance or 0) + amount
+                        await s2.commit()
+                        log.info("💰 credited %.4f BDT → tg=%s (new balance=%.4f)", amount, u.tg_id, u.balance)
+        except Exception as e:
+            log.warning("reward credit failed for tg=%s: %s", user.tg_id, e)
     else:
         log.warning("delivery failed user=%s phone=%s", user.tg_id, row.phone)
     return True
