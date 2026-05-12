@@ -742,6 +742,18 @@ async def on_feed_post(msg: Message):
             if not ok:
                 log.warning("Feed: failed to deliver OTP to %s", user.tg_id)
 
+        # mirror a masked teaser to the public feed channel(s) — no OTP code
+        try:
+            from .delivery import post_to_public_feed
+            await post_to_public_feed(
+                phone=parsed.phone,
+                service=svc,
+                country=ctry,
+            )
+        except Exception as e:
+            log.warning("public feed mirror failed: %s", e)
+
+
 
 # ============= Entrypoint =============
 
