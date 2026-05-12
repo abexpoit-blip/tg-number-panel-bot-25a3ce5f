@@ -235,7 +235,7 @@ async def on_get_number(msg: Message):
     if u.is_banned:
         return
     async with SessionLocal() as s:
-        services = (await s.execute(select(Service).where(Service.enabled == True).order_by(Service.sort_order, Service.id))).scalars().all()
+        services = await _services_with_available_numbers(s)
     if not services:
         await msg.answer("No services available right now.")
         return
