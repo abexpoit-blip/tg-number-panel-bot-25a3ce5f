@@ -45,7 +45,7 @@ export default function Numbers() {
 
   const addOne = async () => {
     if (!single.msisdn || !single.service_id || !single.country_id) return toast.error("Fill all fields");
-    try { await api.numbers.create({ ...single, provider_id: single.provider_id || null }); setSingle({ ...single, msisdn: "" }); load(); toast.success("Number added"); }
+    try { await api.numbers.create({ ...single, provider_id: single.provider_id || null, range_id: single.range_id || null }); setSingle({ ...single, msisdn: "" }); load(); toast.success("Number added"); }
     catch (e: any) { toast.error(e.message); }
   };
   const addBulk = async () => {
