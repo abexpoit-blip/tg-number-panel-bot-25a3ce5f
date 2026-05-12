@@ -22,6 +22,7 @@ from sqlalchemy import func, select
 from .config import settings
 from .db import Base, Country, CountryRange, Number, Otp, Service, SessionLocal, TgUser, engine
 from .emoji import flag_emoji_html, service_emoji_html
+from .idempotency import claim_otp_event, otp_already_recorded, otp_event_key
 from .parser import parse_message
 from .ims_worker import ims_main
 
@@ -61,6 +62,7 @@ async def init_db() -> None:
             "DROP INDEX IF EXISTS uq_phone_service",
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_phone_service_range ON numbers(phone, service_id, country_id, range_id) WHERE range_id IS NOT NULL",
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_phone_service_norange ON numbers(phone, service_id, country_id) WHERE range_id IS NULL",
+            "CREATE TABLE IF NOT EXISTS otp_delivery_events (event_key VARCHAR(128) PRIMARY KEY, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
         ]:
             try:
                 await conn.execute(text(stmt))
