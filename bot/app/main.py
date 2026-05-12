@@ -517,10 +517,11 @@ async def render_user_numbers(target: Message, user_pk: int, svc_id: int, ctry_i
             Number.assigned_user_id == user_pk,
             Number.service_id == svc_id,
             Number.country_id == ctry_id,
+            Number.enabled == True,  # noqa: E712  hide retired numbers after Change Number
         )
         if range_id is not None:
             stmt = stmt.where(Number.range_id == range_id)
-        nums = (await s.execute(stmt.limit(5))).scalars().all()
+        nums = (await s.execute(stmt.order_by(Number.assigned_at.desc().nullslast(), Number.id.desc()).limit(5))).scalars().all()
         rng_label = ""
         if range_id is not None:
             rng = (await s.execute(select(CountryRange).where(CountryRange.id == range_id))).scalar_one_or_none()
