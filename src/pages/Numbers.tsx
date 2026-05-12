@@ -107,6 +107,15 @@ export default function Numbers() {
                 {providers.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Select value={String(single.range_id)} onValueChange={(v) => setSingle({ ...single, range_id: +v })} disabled={!single.country_id}>
+              <SelectTrigger><SelectValue placeholder={single.country_id ? "Range (optional)" : "Pick country first"} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">— No range —</SelectItem>
+                {ranges.filter((r) => r.country_id === single.country_id).map((r) => (
+                  <SelectItem key={r.id} value={String(r.id)}>{r.name}{r.prefix ? ` (${r.prefix})` : ""}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <Button onClick={addOne} className="mt-3 bg-gradient-primary text-primary-foreground"><Plus className="mr-1 h-4 w-4" /> Add</Button>
         </div>
