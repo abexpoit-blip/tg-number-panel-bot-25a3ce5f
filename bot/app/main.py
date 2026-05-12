@@ -668,6 +668,13 @@ async def on_change_number(cb: CallbackQuery):
         if rng_id is not None:
             av_stmt = av_stmt.where(Number.range_id == rng_id)
         avail = (await s.execute(av_stmt.limit(5))).scalars().all()
+        if not avail:
+            # No replacements: rollback the retire so user keeps current numbers.
+            for n in current:
+                n.enabled = True
+            await s.rollback()
+            await cb.answer("😕 No more numbers available in this range.", show_alert=True)
+            return
         for n in avail:
             n.assigned_user_id = u.id
             n.assigned_at = datetime.utcnow()
