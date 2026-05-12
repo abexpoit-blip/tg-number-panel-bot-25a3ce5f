@@ -10,7 +10,7 @@ from .config import settings
 from .db import Base, SessionLocal, engine
 from .models import Admin, Country, Provider, Service
 from .routes import auth as auth_routes
-from .routes import countries, dashboard, feed as feed_routes, ims, numbers, providers as providers_routes, ranges as ranges_routes, services, settings as settings_routes, sms, users, withdrawals
+from .routes import countries, dashboard, feed as feed_routes, ims, notices as notices_routes, numbers, providers as providers_routes, ranges as ranges_routes, services, settings as settings_routes, sms, users, withdrawals
 
 
 async def _ensure_columns(conn):
