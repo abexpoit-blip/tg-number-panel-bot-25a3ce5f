@@ -23,14 +23,17 @@ log = logging.getLogger("bot.delivery")
 API_BASE = "https://api.telegram.org"
 
 
-async def _build_keyboard(code: str) -> list[list[dict[str, Any]]]:
+async def _build_keyboard(code: str, service: Service | None = None) -> list[list[dict[str, Any]]]:
     """IMS-Panel-style 2-row keyboard.
 
-    Row 1: copy-OTP button (primary, premium icon)
-    Row 2: Main Channel (danger) + Number Channel (success), each with premium icon
-    All emoji/url values come from DB settings so admin can change without redeploy.
+    Row 1: copy-OTP button (primary). Icon = service's custom emoji if set,
+           else falls back to the global `otp_button_emoji_id` setting.
+    Row 2: Main Channel (danger) + Number Channel (success).
     """
-    otp_icon = await get_setting("otp_button_emoji_id", "")
+    # Prefer the service's own premium emoji so the OTP button matches the service.
+    svc_icon = (getattr(service, "custom_emoji_id", None) or "").strip() if service else ""
+    fallback_icon = await get_setting("otp_button_emoji_id", "")
+    otp_icon = svc_icon or fallback_icon
     main_url = await get_setting("main_channel_url", "")
     num_url = await get_setting("number_channel_url", "")
     main_icon = await get_setting("main_channel_emoji_id", "")
@@ -63,6 +66,7 @@ async def _build_keyboard(code: str) -> list[list[dict[str, Any]]]:
     return rows
 
 
+
 async def send_otp_message(
     chat_id: int,
     *,
@@ -85,7 +89,7 @@ async def send_otp_message(
         f"{flag}{hashtag} {emoji} <code>{phone}</code>"
     )
 
-    keyboard = await _build_keyboard(code)
+    keyboard = await _build_keyboard(code, service)
     payload = {
         "chat_id": chat_id,
         "text": text,
