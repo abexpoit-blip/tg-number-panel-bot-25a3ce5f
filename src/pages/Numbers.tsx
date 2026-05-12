@@ -138,6 +138,15 @@ export default function Numbers() {
                 {providers.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Select value={String(bulk.range_id)} onValueChange={(v) => setBulk({ ...bulk, range_id: +v })} disabled={!bulk.country_id}>
+              <SelectTrigger><SelectValue placeholder={bulk.country_id ? "Range (optional)" : "Pick country first"} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">— No range —</SelectItem>
+                {ranges.filter((r) => r.country_id === bulk.country_id).map((r) => (
+                  <SelectItem key={r.id} value={String(r.id)}>{r.name}{r.prefix ? ` (${r.prefix})` : ""}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <Textarea rows={4} className="mt-3 font-mono text-xs" placeholder={"393406647354\n393925068153\n…"} value={bulk.msisdns} onChange={(e) => setBulk({ ...bulk, msisdns: e.target.value })} />
           <Button onClick={addBulk} className="mt-3 bg-gradient-primary text-primary-foreground"><Upload className="mr-1 h-4 w-4" /> Bulk insert</Button>
