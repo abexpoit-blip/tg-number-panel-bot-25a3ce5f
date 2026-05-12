@@ -45,7 +45,7 @@ export default function Numbers() {
 
   const addOne = async () => {
     if (!single.msisdn || !single.service_id || !single.country_id) return toast.error("Fill all fields");
-    try { await api.numbers.create({ ...single, provider_id: single.provider_id || null }); setSingle({ ...single, msisdn: "" }); load(); toast.success("Number added"); }
+    try { await api.numbers.create({ ...single, provider_id: single.provider_id || null, range_id: single.range_id || null }); setSingle({ ...single, msisdn: "" }); load(); toast.success("Number added"); }
     catch (e: any) { toast.error(e.message); }
   };
   const addBulk = async () => {
@@ -96,7 +96,7 @@ export default function Numbers() {
               <SelectTrigger><SelectValue placeholder="Service" /></SelectTrigger>
               <SelectContent>{services.map((s) => <SelectItem key={s.id} value={String(s.id)}><ServiceBadge service={s} /></SelectItem>)}</SelectContent>
             </Select>
-            <Select value={String(single.country_id)} onValueChange={(v) => setSingle({ ...single, country_id: +v })}>
+            <Select value={String(single.country_id)} onValueChange={(v) => setSingle({ ...single, country_id: +v, range_id: 0 })}>
               <SelectTrigger><SelectValue placeholder="Country" /></SelectTrigger>
               <SelectContent>{countries.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.flag} {c.name}</SelectItem>)}</SelectContent>
             </Select>
@@ -107,18 +107,27 @@ export default function Numbers() {
                 {providers.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Select value={String(single.range_id)} onValueChange={(v) => setSingle({ ...single, range_id: +v })} disabled={!single.country_id}>
+              <SelectTrigger><SelectValue placeholder={single.country_id ? "Range (optional)" : "Pick country first"} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">— No range —</SelectItem>
+                {ranges.filter((r) => r.country_id === single.country_id).map((r) => (
+                  <SelectItem key={r.id} value={String(r.id)}>{r.name}{r.prefix ? ` (${r.prefix})` : ""}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <Button onClick={addOne} className="mt-3 bg-gradient-primary text-primary-foreground"><Plus className="mr-1 h-4 w-4" /> Add</Button>
         </div>
 
         <div className="glass-card p-5">
           <h3 className="mb-3 font-display text-base font-semibold">Bulk add (one per line)</h3>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Select value={String(bulk.service_id)} onValueChange={(v) => setBulk({ ...bulk, service_id: +v })}>
               <SelectTrigger><SelectValue placeholder="Service" /></SelectTrigger>
               <SelectContent>{services.map((s) => <SelectItem key={s.id} value={String(s.id)}><ServiceBadge service={s} /></SelectItem>)}</SelectContent>
             </Select>
-            <Select value={String(bulk.country_id)} onValueChange={(v) => setBulk({ ...bulk, country_id: +v })}>
+            <Select value={String(bulk.country_id)} onValueChange={(v) => setBulk({ ...bulk, country_id: +v, range_id: 0 })}>
               <SelectTrigger><SelectValue placeholder="Country" /></SelectTrigger>
               <SelectContent>{countries.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.flag} {c.name}</SelectItem>)}</SelectContent>
             </Select>
@@ -127,6 +136,15 @@ export default function Numbers() {
               <SelectContent>
                 <SelectItem value="0">— No provider —</SelectItem>
                 {providers.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={String(bulk.range_id)} onValueChange={(v) => setBulk({ ...bulk, range_id: +v })} disabled={!bulk.country_id}>
+              <SelectTrigger><SelectValue placeholder={bulk.country_id ? "Range (optional)" : "Pick country first"} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">— No range —</SelectItem>
+                {ranges.filter((r) => r.country_id === bulk.country_id).map((r) => (
+                  <SelectItem key={r.id} value={String(r.id)}>{r.name}{r.prefix ? ` (${r.prefix})` : ""}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
