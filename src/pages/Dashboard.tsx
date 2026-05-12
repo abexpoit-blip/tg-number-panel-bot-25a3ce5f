@@ -21,6 +21,19 @@ interface ChartData {
   top_services: { name: string; emoji: string; count: number }[];
 }
 
+interface RangeStat {
+  country_id: number;
+  country_name: string;
+  country_flag: string;
+  country_code: string;
+  range_id: number | null;
+  range_name: string | null;
+  label: string;
+  total: number;
+  assigned: number;
+  available: number;
+}
+
 const STATS = [
   { key: "users", label: "Total users", icon: Users, accent: "from-primary to-primary-glow", glow: "shadow-glow" },
   { key: "numbers", label: "Numbers in pool", icon: Phone, accent: "from-primary to-accent", glow: "" },
