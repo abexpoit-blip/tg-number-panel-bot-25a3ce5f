@@ -49,6 +49,17 @@ class Country(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class CountryRange(Base):
+    __tablename__ = "country_ranges"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    country_id: Mapped[int] = mapped_column(ForeignKey("countries.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    prefix: Mapped[str] = mapped_column(String(32), default="")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class TgUser(Base):
     __tablename__ = "tg_users"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -85,6 +96,7 @@ class Number(Base):
     service_id: Mapped[int] = mapped_column(ForeignKey("services.id", ondelete="CASCADE"), index=True)
     country_id: Mapped[int] = mapped_column(ForeignKey("countries.id", ondelete="CASCADE"), index=True)
     provider_id: Mapped[int | None] = mapped_column(ForeignKey("providers.id", ondelete="SET NULL"), nullable=True, index=True)
+    range_id: Mapped[int | None] = mapped_column(ForeignKey("country_ranges.id", ondelete="SET NULL"), nullable=True, index=True)
     assigned_user_id: Mapped[int | None] = mapped_column(ForeignKey("tg_users.id", ondelete="SET NULL"), nullable=True, index=True)
     assigned_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_otp: Mapped[str | None] = mapped_column(String(32), nullable=True)
