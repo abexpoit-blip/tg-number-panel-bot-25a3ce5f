@@ -56,7 +56,7 @@ export default function Services() {
 
       <div className="glass-card overflow-hidden p-0">
         <table className="data-table">
-          <thead><tr><th>ID</th><th>Preview</th><th>Code</th><th>Name</th><th>Emoji</th><th>Premium ID</th><th>Sort</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>ID</th><th>Preview</th><th>Code</th><th>Name</th><th title="Unicode emoji on inline button">Button Icon</th><th title="Premium emoji rendered in message text">Premium ID</th><th>Sort</th><th>Status</th><th></th></tr></thead>
           <tbody>
             {list.map((s) => (
               <tr key={s.id}>
