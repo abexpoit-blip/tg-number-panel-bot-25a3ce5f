@@ -34,7 +34,7 @@ export default function Numbers() {
   useEffect(() => {
     api.services.list().then(setServices);
     api.countries.list().then(setCountries);
-    api.providers.list().then(setProviders).catch(() => setProviders([]));
+    setProviders([]);
   }, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, [JSON.stringify(filter), page]);
