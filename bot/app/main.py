@@ -54,6 +54,12 @@ async def init_db() -> None:
             "ALTER TABLE countries ADD COLUMN IF NOT EXISTS custom_emoji_id VARCHAR(64)",
             "ALTER TABLE numbers  ADD COLUMN IF NOT EXISTS provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL",
             "ALTER TABLE otps     ADD COLUMN IF NOT EXISTS provider_id INTEGER REFERENCES providers(id) ON DELETE SET NULL",
+            "ALTER TABLE numbers  ADD COLUMN IF NOT EXISTS range_id INTEGER REFERENCES country_ranges(id) ON DELETE SET NULL",
+            "CREATE INDEX IF NOT EXISTS ix_numbers_range_id ON numbers(range_id)",
+            "ALTER TABLE numbers DROP CONSTRAINT IF EXISTS uq_phone_service",
+            "DROP INDEX IF EXISTS uq_phone_service",
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_phone_service_range ON numbers(phone, service_id, country_id, range_id) WHERE range_id IS NOT NULL",
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_phone_service_norange ON numbers(phone, service_id, country_id) WHERE range_id IS NULL",
         ]:
             try:
                 await conn.execute(text(stmt))

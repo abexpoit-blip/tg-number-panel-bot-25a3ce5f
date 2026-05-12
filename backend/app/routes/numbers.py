@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth import current_admin
 from ..db import get_db
-from ..models import Number
+from ..models import CountryRange, Number
 
 router = APIRouter()
 
@@ -61,6 +61,25 @@ def _d(n: Number):
         "last_otp_at": n.last_otp_at.isoformat() if n.last_otp_at else None,
         "enabled": n.enabled,
     }
+
+
+def _range_match(range_id: int | None):
+    return Number.range_id.is_(None) if range_id is None else Number.range_id == range_id
+
+
+async def _validated_range_id(db: AsyncSession, country_id: int, range_id: int | None) -> int | None:
+    range_id = range_id or None
+    if range_id is None:
+        return None
+    exists = (await db.execute(
+        select(CountryRange.id).where(
+            CountryRange.id == range_id,
+            CountryRange.country_id == country_id,
+        )
+    )).scalar_one_or_none()
+    if exists is None:
+        raise HTTPException(400, "Range does not belong to the selected country")
+    return range_id
 
 
 def _apply_filters(stmt, *, service_id, country_id, assigned, status, q, prefix):
@@ -145,8 +164,9 @@ async def bulk_delete(
 @router.post("")
 async def create_number(body: NumberIn, _: object = Depends(current_admin), db: AsyncSession = Depends(get_db)):
     phone = re.sub(r"\D", "", body.phone)
+    range_id = await _validated_range_id(db, body.country_id, body.range_id)
     n = Number(phone=phone, service_id=body.service_id, country_id=body.country_id,
-               provider_id=body.provider_id, range_id=body.range_id, enabled=body.enabled)
+               provider_id=body.provider_id, range_id=range_id, enabled=body.enabled)
     db.add(n)
     try:
         await db.commit()
@@ -161,23 +181,31 @@ async def create_number(body: NumberIn, _: object = Depends(current_admin), db: 
 async def bulk(body: BulkIn, _: object = Depends(current_admin), db: AsyncSession = Depends(get_db)):
     raw = re.split(r"[\s,;]+", body.phones.strip())
     phones = [re.sub(r"\D", "", p) for p in raw if p.strip()]
-    inserted = 0
-    for ph in phones:
-        if not ph:
-            continue
-        exists = (await db.execute(
-            select(Number).where(
-                Number.phone == ph,
+    range_id = await _validated_range_id(db, body.country_id, body.range_id)
+    unique_phones = list(dict.fromkeys(ph for ph in phones if ph))
+    existing = set()
+    if unique_phones:
+        existing = set((await db.execute(
+            select(Number.phone).where(
+                Number.phone.in_(unique_phones),
                 Number.service_id == body.service_id,
-                Number.range_id.is_(body.range_id) if body.range_id is None else Number.range_id == body.range_id,
+                Number.country_id == body.country_id,
+                _range_match(range_id),
             )
-        )).scalar_one_or_none()
-        if exists:
-            continue
-        db.add(Number(phone=ph, service_id=body.service_id, country_id=body.country_id,
-                      provider_id=body.provider_id, range_id=body.range_id))
-        inserted += 1
-    await db.commit()
+        )).scalars().all())
+    rows = [
+        Number(phone=ph, service_id=body.service_id, country_id=body.country_id,
+               provider_id=body.provider_id, range_id=range_id)
+        for ph in unique_phones
+        if ph not in existing
+    ]
+    db.add_all(rows)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(409, "One or more numbers already exist for this service, country, and range")
+    inserted = len(rows)
     return {"inserted": inserted, "submitted": len(phones)}
 
 
